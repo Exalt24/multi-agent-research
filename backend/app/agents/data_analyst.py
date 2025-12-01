@@ -29,6 +29,8 @@ class DataAnalystAgent(BaseAgent):
         self.analysis_prompt = ChatPromptTemplate.from_messages([
             ("system", """You are a data analyst specializing in competitive analysis.
 
+CRITICAL: Use STRICT markdown formatting with proper tables and structure.
+
 Analyze the research data and create a comprehensive comparison:
 
 1. Feature Comparison Matrix (table format)
@@ -37,42 +39,67 @@ Analyze the research data and create a comprehensive comparison:
 4. Market Positioning insights
 5. Competitive Advantages summary
 
-Be data-driven, factual, and structured. Use markdown tables where appropriate."""),
+FORMATTING RULES:
+- Use ## for main sections (H2)
+- Use ### for subsections (H3)
+- Use proper markdown tables with | separators
+- Add blank lines between sections
+- Use **bold** for labels
+- Use - for bullet points
+- Ensure tables are properly formatted with header row and separator row"""),
             ("human", """Companies: {companies}
 
 Research Data:
 {research_data}
 
-Provide a comprehensive competitive analysis with:
+Create a comprehensive competitive analysis using this EXACT structure:
 
 ## Feature Comparison Matrix
+
 | Feature | {company_list} |
 |---------|{separator}|
-[Fill in based on research]
+| Feature 1 | Company A value | Company B value |
+| Feature 2 | Company A value | Company B value |
+
+(Add 5-7 key features based on research)
 
 ## Pricing Comparison
-[Comparison if data available, or "Not enough data"]
+
+[Comparison table or text if data available, or "Insufficient pricing data in research results"]
 
 ## SWOT Analysis
 
-### {company_1}
-**Strengths:**
--
-**Weaknesses:**
--
-**Opportunities:**
--
-**Threats:**
--
+### Company 1
 
-[Repeat for each company]
+**Strengths:**
+- Strength 1
+- Strength 2
+
+**Weaknesses:**
+- Weakness 1
+- Weakness 2
+
+**Opportunities:**
+- Opportunity 1
+- Opportunity 2
+
+**Threats:**
+- Threat 1
+- Threat 2
+
+(Repeat ### Company sections for each company)
 
 ## Market Positioning
-[Analysis of how each company positions itself]
+
+[2-3 paragraphs analyzing how each company positions itself in the market]
 
 ## Competitive Advantages
-[Summary of unique strengths per company]
-""")
+
+- **Company 1:** [Key advantages]
+- **Company 2:** [Key advantages]
+- **Company 3:** [Key advantages]
+
+Follow this structure exactly with proper markdown formatting.""")
         ])
 
     async def _process(self, state: MarketResearchState) -> Dict[str, Any]:
