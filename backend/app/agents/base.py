@@ -117,10 +117,20 @@ class BaseAgent(ABC):
 
     def _handle_error(self, error_msg: str, state: MarketResearchState) -> Dict[str, Any]:
         """Handle error and return error state update."""
+        # Make error messages user-friendly
+        user_friendly_msg = error_msg
+        if "rate_limit" in error_msg.lower():
+            user_friendly_msg = f"{self.name}: Rate limit reached. Please try again in a few minutes."
+        elif "404" in error_msg and "model" in error_msg.lower():
+            user_friendly_msg = f"{self.name}: Model not available. Please check configuration."
+        else:
+            # Truncate very long error messages
+            user_friendly_msg = error_msg[:200] + "..." if len(error_msg) > 200 else error_msg
+
         return {
             "errors": [{
                 "agent": self.name,
-                "error": error_msg,
+                "error": user_friendly_msg,
                 "timestamp": time.time()
             }],
             "current_agent": self.name,
