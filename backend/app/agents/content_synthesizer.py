@@ -33,13 +33,20 @@ Create a concise executive summary (2-3 paragraphs) that captures:
 3. Main competitive differences
 4. Recommendation (if applicable)
 
-Use clear, professional language suitable for decision-makers."""),
+Use clear, professional language suitable for decision-makers.
+
+CRITICAL: Do NOT include "Executive Summary" as a header. Just write the content directly since the UI already has the header.
+
+Use markdown formatting:
+- Use **bold** for emphasis
+- Use bullet points with * for lists
+- Use clear paragraphs"""),
             ("human", """Query: {query}
 
 Comparative Analysis:
 {analysis}
 
-Write an executive summary.""")
+Write an executive summary. Do NOT start with "Executive Summary:" or any header. Just write the summary content with proper markdown formatting.""")
         ])
 
         # Prompt for full report
