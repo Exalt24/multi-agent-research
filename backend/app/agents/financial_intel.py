@@ -31,6 +31,8 @@ class FinancialIntelligenceAgent(BaseAgent):
         self.analysis_prompt = ChatPromptTemplate.from_messages([
             ("system", """You are a financial analyst researching company data.
 
+CRITICAL: Output MUST be in clean markdown format with proper structure.
+
 Extract and structure:
 1. Funding: Rounds, amounts, investors, valuations
 2. Revenue: Estimates, growth trends
@@ -38,13 +40,43 @@ Extract and structure:
 4. Market traction: Users, customers, metrics
 5. Recent developments
 
-Be factual. If data not found, state clearly."""),
+Be factual. If data not found, state clearly "Not found in search results."
+
+FORMATTING RULES:
+- Use ## for section headers (H2)
+- Use - for bullet lists
+- Add blank line after headers
+- Add blank line between sections
+- Use **bold** for key numbers/amounts
+- Keep concise and structured"""),
             ("human", """Company: {company}
 
 Search Results:
 {search_results}
 
-Analyze financial and growth data.""")
+Provide financial analysis using this EXACT format:
+
+## Funding & Investment
+
+[Funding rounds, amounts, investors, or "Not found in search results"]
+
+## Revenue & Growth
+
+[Revenue estimates, growth trends, or "Not found in search results"]
+
+## Team Size & Growth
+
+[Team size, growth rate, or "Not found in search results"]
+
+## Market Traction
+
+[Users, customers, key metrics, or "Not found in search results"]
+
+## Recent Developments
+
+[Recent financial news, acquisitions, partnerships, or "No recent developments found"]
+
+Follow this structure exactly with proper markdown formatting.""")
         ])
 
     async def _process(self, state: MarketResearchState) -> Dict[str, Any]:
