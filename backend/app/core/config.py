@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # Constants (hardcoded defaults, rarely change)
     ollama_base_url: str = "http://localhost:11434"
     rag_api_url: str = "https://enterprise-rag-api.onrender.com/api"
-    default_llm_model: str = "llama3.3-70b-versatile"
+    default_llm_model: str = "llama-3.3-70b-versatile"
     local_llm_model: str = "llama3"
     log_level: str = "INFO"
     max_parallel_agents: int = 2
