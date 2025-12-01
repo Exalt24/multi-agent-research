@@ -4,7 +4,6 @@ import { use } from "react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import AgentCard from "@/components/AgentCard";
 import ReactMarkdown from "react-markdown";
-import jsPDF from "jspdf";
 
 interface PageProps {
   params: Promise<{ sessionId: string }>;
