@@ -1,11 +1,24 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 
+interface ResearchResults {
+  competitor_profiles: Record<string, { analysis: string; sources: string[] }>;
+  comparative_analysis: { analysis_text: string };
+  executive_summary: string;
+  final_report: string;
+  visualizations: Array<{
+    title: string;
+    type: string;
+    description: string;
+  }>;
+  cost_tracking: Record<string, unknown>;
+}
+
 interface AgentStatus {
   agent: string;
   status: string;
   progress: number;
   message: string;
-  data: any;
+  data: Record<string, unknown>;
   timestamp: number;
 }
 
@@ -16,7 +29,7 @@ interface WebSocketMessage {
   status?: string;
   progress?: number;
   message?: string;
-  data?: any;
+  data?: ResearchResults | Record<string, unknown>;
   timestamp?: number;
   error?: string;
 }
@@ -25,9 +38,10 @@ export function useWebSocket(sessionId: string) {
   const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [finalResults, setFinalResults] = useState<any>(null);
+  const [finalResults, setFinalResults] = useState<ResearchResults | null>(null);
   const [workflowComplete, setWorkflowComplete] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
+  const workflowCompleteRef = useRef(false);
 
   const connect = useCallback(() => {
     if (!sessionId) {
@@ -54,7 +68,7 @@ export function useWebSocket(sessionId: string) {
         const message: WebSocketMessage = JSON.parse(event.data);
 
         if (message.type === "agent_status" && message.agent) {
-          const agentName = message.agent as string; // Type assertion
+          const agentName = message.agent;
           setAgentStatuses((prev) => ({
             ...prev,
             [agentName]: {
@@ -62,13 +76,14 @@ export function useWebSocket(sessionId: string) {
               status: message.status || "unknown",
               progress: message.progress || 0,
               message: message.message || "",
-              data: message.data || {},
+              data: (message.data as Record<string, unknown>) || {},
               timestamp: message.timestamp || Date.now(),
             },
           }));
         } else if (message.type === "workflow_complete") {
           setWorkflowComplete(true);
-          setFinalResults(message.data);
+          workflowCompleteRef.current = true;
+          setFinalResults((message.data as ResearchResults) || null);
         } else if (message.type === "workflow_failed") {
           setError(message.error || "Workflow failed");
         }
@@ -90,7 +105,7 @@ export function useWebSocket(sessionId: string) {
 
       // Auto-reconnect after 2 seconds (faster than before)
       setTimeout(() => {
-        if (wsRef.current === ws && !workflowComplete) {
+        if (wsRef.current === ws && !workflowCompleteRef.current) {
           console.log("Attempting reconnect...");
           connect();
         }
@@ -98,7 +113,7 @@ export function useWebSocket(sessionId: string) {
     };
 
     wsRef.current = ws;
-  }, [sessionId, workflowComplete]);
+  }, [sessionId]);
 
   useEffect(() => {
     // Small delay to let backend initialize session
