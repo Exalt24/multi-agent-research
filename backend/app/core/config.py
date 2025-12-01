@@ -30,7 +30,11 @@ class Settings(BaseSettings):
     agent_timeout: int = 120
 
     # CORS
-    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:3001"]
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://multi-agent-research-frontend.vercel.app"
+    ]
 
     @property
     def is_production(self) -> bool:
