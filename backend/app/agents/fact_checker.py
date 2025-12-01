@@ -30,25 +30,45 @@ class FactCheckerAgent(BaseAgent):
         self.fact_check_prompt = ChatPromptTemplate.from_messages([
             ("system", """You are a fact-checker verifying research claims.
 
+CRITICAL: Output MUST be in clean markdown format with proper structure.
+
 For each major claim in the analysis:
 1. Identify the claim
 2. Assess confidence (High/Medium/Low) based on sources
 3. Flag contradictions or unsupported statements
 4. Note if verification needed
 
-Output format:
-## Verified Claims
-- [Claim]: Confidence: High/Medium/Low. [Reasoning]
-
-## Flagged for Review
-- [Claim]: [Issue]
-
-## Overall Assessment
-[Summary of data quality]"""),
+FORMATTING RULES:
+- Use ## for main sections (H2)
+- Use - for bullet lists with proper format
+- Add blank lines between sections
+- Use **bold** for confidence levels
+- Keep structured and clear"""),
             ("human", """Analysis to verify:
 {analysis}
 
-Fact-check this analysis and provide confidence scores.""")
+Fact-check this analysis using this EXACT format:
+
+## Verified Claims
+
+- **Claim:** [Exact claim from analysis]
+  **Confidence:** High/Medium/Low
+  **Reasoning:** [Why this confidence level based on sources]
+
+(Repeat for 3-5 major claims)
+
+## Flagged for Review
+
+- **Claim:** [Claim that needs verification]
+  **Issue:** [Contradiction, unsupported, or needs more data]
+
+(List any problematic claims, or "No major issues found")
+
+## Overall Assessment
+
+[2-3 sentences summarizing the data quality, source reliability, and overall confidence in the analysis]
+
+Follow this structure exactly with proper markdown formatting.""")
         ])
 
     async def _process(self, state: MarketResearchState) -> Dict[str, Any]:
