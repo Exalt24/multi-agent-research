@@ -39,14 +39,21 @@ Analyze the research data and create a comprehensive comparison:
 4. Market Positioning insights
 5. Competitive Advantages summary
 
-FORMATTING RULES:
+MARKDOWN TABLE FORMATTING RULES (CRITICAL):
+1. Each table row MUST be on its own line (use newline character \\n)
+2. Never put multiple rows on the same line
+3. Format: | Column 1 | Column 2 | Column 3 |
+4. Header row, separator row, then data rows
+5. Each row separated by newline
+
+GENERAL FORMATTING RULES:
 - Use ## for main sections (H2)
 - Use ### for subsections (H3)
 - Use proper markdown tables with | separators
 - Add blank lines between sections
 - Use **bold** for labels
 - Use - for bullet points
-- Ensure tables are properly formatted with header row and separator row"""),
+- NEVER concatenate table rows on one line"""),
             ("human", """Companies: {companies}
 
 Research Data:
@@ -56,12 +63,16 @@ Create a comprehensive competitive analysis using this EXACT structure:
 
 ## Feature Comparison Matrix
 
+CRITICAL: Each table row must be on its OWN LINE with newline characters.
+
+Example format (note: each row on separate line):
 | Feature | {company_list} |
 |---------|{separator}|
 | Feature 1 | Company A value | Company B value |
 | Feature 2 | Company A value | Company B value |
+| Feature 3 | Company A value | Company B value |
 
-(Add 5-7 key features based on research)
+Create a table with 5-7 key features. IMPORTANT: Put each row on a NEW LINE.
 
 ## Pricing Comparison
 
