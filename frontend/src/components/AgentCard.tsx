@@ -6,7 +6,13 @@ interface AgentCardProps {
   message: string;
 }
 
-export default function AgentCard({ name, description, status, progress, message }: AgentCardProps) {
+export default function AgentCard({
+  name,
+  description,
+  status,
+  progress,
+  message,
+}: AgentCardProps) {
   const getStatusColor = () => {
     switch (status) {
       case "completed":
@@ -23,13 +29,29 @@ export default function AgentCard({ name, description, status, progress, message
   const getStatusBadge = () => {
     switch (status) {
       case "completed":
-        return <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full">Completed</span>;
+        return (
+          <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full">
+            Completed
+          </span>
+        );
       case "running":
-        return <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full animate-pulse">Running</span>;
+        return (
+          <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full animate-pulse">
+            Running
+          </span>
+        );
       case "failed":
-        return <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-full">Failed</span>;
+        return (
+          <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-full">
+            Failed
+          </span>
+        );
       default:
-        return <span className="px-2 py-1 bg-gray-500/20 text-gray-400 text-xs rounded-full">Pending</span>;
+        return (
+          <span className="px-2 py-1 bg-gray-500/20 text-gray-400 text-xs rounded-full">
+            Pending
+          </span>
+        );
     }
   };
 
@@ -53,10 +75,13 @@ export default function AgentCard({ name, description, status, progress, message
         <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
           <div
             className={`h-full transition-all duration-500 ${
-              status === "completed" ? "bg-green-500" :
-              status === "running" ? "bg-blue-500" :
-              status === "failed" ? "bg-red-500" :
-              "bg-gray-600"
+              status === "completed"
+                ? "bg-green-500"
+                : status === "running"
+                ? "bg-blue-500"
+                : status === "failed"
+                ? "bg-red-500"
+                : "bg-gray-600"
             }`}
             style={{ width: `${progress}%` }}
           />
@@ -64,9 +89,7 @@ export default function AgentCard({ name, description, status, progress, message
       </div>
 
       {/* Status Message */}
-      <div className="text-xs text-gray-400">
-        {message}
-      </div>
+      <div className="text-xs text-gray-400">{message}</div>
     </div>
   );
 }
