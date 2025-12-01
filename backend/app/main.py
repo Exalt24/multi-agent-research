@@ -100,6 +100,14 @@ async def start_research(request: ResearchRequest):
         # Run research in background task
         async def run_in_background():
             try:
+                # Send initial "workflow started" message
+                await ws_manager.send_update(session_id, {
+                    "type": "workflow_started",
+                    "session_id": session_id,
+                    "status": "started",
+                    "message": "Research workflow initiated"
+                })
+
                 final_state = await run_research(
                     query=request.query,
                     companies=request.companies,
