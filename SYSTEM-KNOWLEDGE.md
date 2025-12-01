@@ -574,32 +574,25 @@ All clients get updates, handles reconnections gracefully.
 
 ## Microservices Integration
 
-### RAG API as Agent Tool
+### RAG API as Agent Tool (Optional)
 
-**Pattern:** Agents call other microservices as tools.
+**Pattern:** Agents can call other microservices as tools.
 
-```python
-class WebResearchAgent:
-    def __init__(self, rag_api_url):
-        self.rag_client = RAGClient(rag_api_url)
+**Implementation:** Web Research Agent has optional RAG client that queries Project 1's Enterprise RAG API.
 
-    async def _research_company(self, company):
-        # Check existing knowledge first
-        rag_response = await self.rag_client.query(f"What is {company}?")
+**Status:** Configured but optional - RAG API integration shows microservices pattern but isn't critical for core functionality.
 
-        # Then do web search
-        search_results = await self.search_manager.search(...)
-
-        # Combine both sources
-        return analyze(rag_response + search_results)
-```
-
-**Benefits:**
-- **Reuses existing systems** - Don't rebuild RAG, just call it
+**Benefits if used:**
+- **Reuses existing systems** - Check knowledge base before web search
 - **Composability** - Projects become building blocks
 - **Demonstrates architecture** - Shows microservices thinking
 
-**Interview point:** "This agent integrates with my previous RAG project, showing how AI systems can be composed."
+**Why it's optional:**
+- Core research works without it (Tavily + DuckDuckGo search)
+- RAG API must have relevant data to be useful
+- Adds latency (extra API call)
+
+**Interview point:** "The system demonstrates microservices composition - agents can optionally query my RAG project's API - but the core functionality doesn't depend on it."
 
 ---
 
