@@ -20,7 +20,7 @@ const AGENTS = [
 
 export default function ResearchPage({ params }: PageProps) {
   const { sessionId } = use(params);
-  const { agentStatuses, isConnected, error } = useWebSocket(sessionId);
+  const { agentStatuses, isConnected, error, finalResults, workflowComplete } = useWebSocket(sessionId);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 text-white">
@@ -87,6 +87,61 @@ export default function ResearchPage({ params }: PageProps) {
             ))}
           </div>
         </div>
+
+        {/* Final Results */}
+        {workflowComplete && finalResults && (
+          <div className="mt-8 bg-gradient-to-br from-green-900/30 to-blue-900/30 backdrop-blur-sm rounded-xl p-8 border border-green-700/50">
+            <h2 className="text-2xl font-bold mb-6 text-green-400">Research Complete!</h2>
+
+            {/* Executive Summary */}
+            {finalResults.executive_summary && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-2">Executive Summary</h3>
+                <p className="text-gray-300 whitespace-pre-wrap">{finalResults.executive_summary}</p>
+              </div>
+            )}
+
+            {/* Full Report */}
+            {finalResults.final_report && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-2">Full Report</h3>
+                <div className="prose prose-invert max-w-none">
+                  <pre className="whitespace-pre-wrap text-sm text-gray-300 bg-gray-900/50 p-4 rounded">
+                    {finalResults.final_report}
+                  </pre>
+                </div>
+              </div>
+            )}
+
+            {/* Competitor Profiles */}
+            {finalResults.competitor_profiles && Object.keys(finalResults.competitor_profiles).length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-2">Competitor Profiles</h3>
+                {Object.entries(finalResults.competitor_profiles).map(([company, profile]: [string, any]) => (
+                  <div key={company} className="mb-4 p-4 bg-gray-900/50 rounded">
+                    <h4 className="font-semibold text-blue-400 mb-2">{company}</h4>
+                    <pre className="whitespace-pre-wrap text-sm text-gray-300">{profile.analysis}</pre>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Download Button */}
+            <button
+              onClick={() => {
+                const blob = new Blob([JSON.stringify(finalResults, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `research-${sessionId}.json`;
+                a.click();
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold"
+            >
+              Download Results (JSON)
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
