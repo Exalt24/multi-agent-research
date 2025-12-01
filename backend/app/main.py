@@ -91,6 +91,9 @@ async def start_research(request: ResearchRequest):
         print(f">>> Starting research: {request.query}")
         print(f"Companies: {', '.join(request.companies)}")
 
+        # Get WebSocket manager
+        ws_manager = get_ws_manager()
+
         # Generate session ID
         session_id = str(uuid.uuid4())
 
