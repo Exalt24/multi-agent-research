@@ -11,13 +11,14 @@ interface AgentStatus {
 
 interface WebSocketMessage {
   type: string;
-  session_id: string;
-  agent: string;
-  status: string;
-  progress: number;
-  message: string;
-  data: any;
-  timestamp: number;
+  session_id?: string;
+  agent?: string;
+  status?: string;
+  progress?: number;
+  message?: string;
+  data?: any;
+  timestamp?: number;
+  error?: string;
 }
 
 export function useWebSocket(sessionId: string) {
