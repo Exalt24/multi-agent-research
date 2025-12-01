@@ -101,7 +101,23 @@ export default function ResearchPage({ params }: PageProps) {
             {finalResults.executive_summary && (
               <div className="mb-6">
                 <h3 className="text-lg font-semibold mb-2">Executive Summary</h3>
-                <p className="text-gray-300 whitespace-pre-wrap">{finalResults.executive_summary}</p>
+                <div className="prose prose-invert max-w-none">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                    components={{
+                      h2: ({ node, ...props }) => <h2 className="text-lg font-semibold mb-2 mt-4 text-purple-400" {...props} />,
+                      h3: ({ node, ...props }) => <h3 className="text-base font-semibold mb-2 mt-3 text-purple-300" {...props} />,
+                      p: ({ node, ...props }) => <p className="mb-3 text-gray-300 leading-relaxed" {...props} />,
+                      ul: ({ node, ...props }) => <ul className="mb-3 ml-5 space-y-1 list-disc" {...props} />,
+                      ol: ({ node, ...props }) => <ol className="mb-3 ml-5 space-y-1 list-decimal" {...props} />,
+                      li: ({ node, ...props }) => <li className="text-gray-300" {...props} />,
+                      strong: ({ node, ...props }) => <strong className="text-white font-semibold" {...props} />,
+                    }}
+                  >
+                    {finalResults.executive_summary}
+                  </ReactMarkdown>
+                </div>
               </div>
             )}
 
