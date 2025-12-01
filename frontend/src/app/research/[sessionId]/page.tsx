@@ -1,0 +1,93 @@
+"use client";
+
+import { use } from "react";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import AgentCard from "@/components/AgentCard";
+
+interface PageProps {
+  params: Promise<{ sessionId: string }>;
+}
+
+const AGENTS = [
+  { name: "Coordinator Agent", description: "Plans research workflow" },
+  { name: "Web Research Agent", description: "Gathers competitive intelligence" },
+  { name: "Financial Intelligence Agent", description: "Researches funding and growth" },
+  { name: "Data Analyst Agent", description: "Creates SWOT and comparisons" },
+  { name: "Fact Checker Agent", description: "Validates claims" },
+  { name: "Content Synthesizer Agent", description: "Writes final report" },
+  { name: "Data Visualization Agent", description: "Generates chart specs" },
+];
+
+export default function ResearchPage({ params }: PageProps) {
+  const { sessionId } = use(params);
+  const { agentStatuses, isConnected, error } = useWebSocket(sessionId);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 text-white">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold mb-2">
+            Research in Progress
+          </h1>
+          <p className="text-gray-400">
+            Session ID: <code className="text-sm bg-gray-800 px-2 py-1 rounded">{sessionId}</code>
+          </p>
+
+          {/* Connection Status */}
+          <div className="mt-4 flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
+            <span className="text-sm text-gray-400">
+              {isConnected ? "Connected" : "Disconnected"}
+            </span>
+          </div>
+
+          {error && (
+            <div className="mt-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-200 text-sm">
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Agent Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {AGENTS.map((agent) => {
+            const status = agentStatuses[agent.name];
+            return (
+              <AgentCard
+                key={agent.name}
+                name={agent.name}
+                description={agent.description}
+                status={status?.status || "pending"}
+                progress={status?.progress || 0}
+                message={status?.message || "Waiting to start..."}
+              />
+            );
+          })}
+        </div>
+
+        {/* Overall Progress */}
+        <div className="mt-8 bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700">
+          <h2 className="text-xl font-semibold mb-4">Overall Progress</h2>
+          <div className="space-y-2">
+            {Object.entries(agentStatuses).map(([agent, status]) => (
+              <div key={agent} className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${
+                  status.status === "completed" ? "bg-green-500" :
+                  status.status === "running" ? "bg-blue-500 animate-pulse" :
+                  status.status === "failed" ? "bg-red-500" :
+                  "bg-gray-500"
+                }`} />
+                <div className="flex-1">
+                  <div className="text-sm font-medium">{agent}</div>
+                  <div className="text-xs text-gray-400">{status.message}</div>
+                </div>
+                <div className="text-sm text-gray-400">{status.progress}%</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
