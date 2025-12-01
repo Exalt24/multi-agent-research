@@ -18,7 +18,7 @@ from datetime import datetime
 settings = get_settings()
 
 
-def create_research_graph():
+def create_research_graph(ws_manager=None):
     """Create the complete research workflow graph.
 
     Workflow:
@@ -27,34 +27,40 @@ def create_research_graph():
     3. Data Analyst (analyzes research)
     4. Fact Checker (validates analysis)
     5. Content Synthesizer + Data Viz (parallel outputs)
+
+    Args:
+        ws_manager: WebSocket manager for real-time updates
     """
 
-    # Initialize all agents
+    # Initialize all agents with WebSocket manager
     llm = get_llm(temperature=0.7)
 
-    coordinator = CoordinatorAgent(llm=llm)
+    coordinator = CoordinatorAgent(llm=llm, ws_manager=ws_manager)
 
     web_research = WebResearchAgent(
         llm=llm,
         tavily_api_key=settings.tavily_api_key,
-        rag_api_url=settings.rag_api_url
+        rag_api_url=settings.rag_api_url,
+        ws_manager=ws_manager
     )
 
     financial_intel = FinancialIntelligenceAgent(
         llm=llm,
-        tavily_api_key=settings.tavily_api_key
+        tavily_api_key=settings.tavily_api_key,
+        ws_manager=ws_manager
     )
 
-    data_analyst = DataAnalystAgent(llm=llm)
+    data_analyst = DataAnalystAgent(llm=llm, ws_manager=ws_manager)
 
     fact_checker = FactCheckerAgent(
         llm=llm,
-        tavily_api_key=settings.tavily_api_key
+        tavily_api_key=settings.tavily_api_key,
+        ws_manager=ws_manager
     )
 
-    content_synthesizer = ContentSynthesizerAgent(llm=llm)
+    content_synthesizer = ContentSynthesizerAgent(llm=llm, ws_manager=ws_manager)
 
-    data_viz = DataVisualizationAgent(llm=llm)
+    data_viz = DataVisualizationAgent(llm=llm, ws_manager=ws_manager)
 
     # Define workflow graph
     workflow = StateGraph(MarketResearchState)
@@ -138,8 +144,17 @@ async def run_research(
         "approval_responses": {}
     }
 
-    # Create and run complete graph
-    graph = create_research_graph()
+    # Get WebSocket manager for real-time updates
+    from ..api.websocket import get_ws_manager
+    ws_manager = get_ws_manager()
+
+    # Create and run complete graph with WebSocket support
+    graph = create_research_graph(ws_manager)
+
+    # Set session ID on all agents (done via wrapper)
+    session_id = initial_state["session_id"]
+
+    # Run the graph
     final_state = await graph.ainvoke(initial_state)
 
     # Mark completion

@@ -1,10 +1,11 @@
 """FastAPI application for multi-agent market research."""
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from .core.config import get_settings
 from .api.schemas import ResearchRequest, ResearchResponse, HealthResponse
+from .api.websocket import get_ws_manager
 from .agents.graph import run_research
 import uvicorn
 
@@ -50,6 +51,27 @@ async def health_check():
         status="healthy",
         message="Multi-Agent Research Platform is running"
     )
+
+
+@app.websocket("/ws/research/{session_id}")
+async def websocket_endpoint(websocket: WebSocket, session_id: str):
+    """WebSocket endpoint for real-time research updates.
+
+    Args:
+        websocket: WebSocket connection
+        session_id: Research session ID to monitor
+    """
+    ws_manager = get_ws_manager()
+    await ws_manager.connect(websocket, session_id)
+
+    try:
+        # Keep connection alive and receive messages
+        while True:
+            data = await websocket.receive_text()
+            # Echo back (can implement client commands here if needed)
+            await websocket.send_text(f"Received: {data}")
+    except WebSocketDisconnect:
+        await ws_manager.disconnect(websocket, session_id)
 
 
 @app.post("/api/research", response_model=ResearchResponse)
