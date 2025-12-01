@@ -30,10 +30,18 @@ export function useWebSocket(sessionId: string) {
   const wsRef = useRef<WebSocket | null>(null);
 
   const connect = useCallback(() => {
-    if (!sessionId) return;
+    if (!sessionId) {
+      console.error("Cannot connect: sessionId is missing");
+      return;
+    }
 
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
-    const ws = new WebSocket(`${wsUrl}/ws/research/${sessionId}`);
+    const fullUrl = `${wsUrl}/ws/research/${sessionId}`;
+
+    console.log("Connecting to WebSocket:", fullUrl);
+    console.log("Session ID:", sessionId);
+
+    const ws = new WebSocket(fullUrl);
 
     ws.onopen = () => {
       console.log("WebSocket connected");
@@ -71,31 +79,35 @@ export function useWebSocket(sessionId: string) {
 
     ws.onerror = (event) => {
       console.error("WebSocket error:", event);
-      console.error("WebSocket URL was:", `${wsUrl}/ws/research/${sessionId}`);
+      console.error("WebSocket URL was:", fullUrl);
       console.error("Session ID:", sessionId);
-      setError("WebSocket connection error");
+      // Don't set error state - let it reconnect automatically
     };
 
-    ws.onclose = () => {
-      console.log("WebSocket disconnected");
+    ws.onclose = (event) => {
+      console.log("WebSocket disconnected. Code:", event.code, "Reason:", event.reason);
       setIsConnected(false);
 
-      // Attempt reconnect after 3 seconds
+      // Auto-reconnect after 2 seconds (faster than before)
       setTimeout(() => {
-        if (wsRef.current === ws) {
+        if (wsRef.current === ws && !workflowComplete) {
           console.log("Attempting reconnect...");
           connect();
         }
-      }, 3000);
+      }, 2000);
     };
 
     wsRef.current = ws;
-  }, [sessionId]);
+  }, [sessionId, workflowComplete]);
 
   useEffect(() => {
-    connect();
+    // Small delay to let backend initialize session
+    const timer = setTimeout(() => {
+      connect();
+    }, 500);
 
     return () => {
+      clearTimeout(timer);
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
