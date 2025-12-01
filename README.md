@@ -558,12 +558,6 @@ vercel --prod --yes
 
 ---
 
-## RAG Integration (Optional)
-
-The Web Research Agent can optionally integrate with an external RAG (Retrieval-Augmented Generation) API to check existing knowledge before performing web searches. This reduces redundant searches and leverages historical data.
-
-Configure via `RAG_API_URL` in `backend/app/core/config.py`.
-
 ---
 
 ## Performance & Optimization
