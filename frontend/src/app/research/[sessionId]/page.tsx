@@ -127,58 +127,38 @@ export default function ResearchPage({ params }: PageProps) {
             )}
 
             {/* Download Buttons */}
-            <div className="flex gap-4">
+            <div className="flex gap-3">
               <button
                 onClick={() => {
-                  const pdf = new jsPDF();
-                  const pageWidth = pdf.internal.pageSize.getWidth();
-                  const margin = 20;
-                  let y = 20;
+                  // Create markdown content
+                  let markdownContent = "# Market Research Report\n\n";
 
-                  // Title
-                  pdf.setFontSize(20);
-                  pdf.text("Market Research Report", margin, y);
-                  y += 15;
-
-                  // Executive Summary
                   if (finalResults.executive_summary) {
-                    pdf.setFontSize(16);
-                    pdf.text("Executive Summary", margin, y);
-                    y += 10;
-                    pdf.setFontSize(11);
-                    const summaryLines = pdf.splitTextToSize(finalResults.executive_summary, pageWidth - margin * 2);
-                    pdf.text(summaryLines, margin, y);
-                    y += (summaryLines.length * 7) + 10;
+                    markdownContent += "## Executive Summary\n\n";
+                    markdownContent += finalResults.executive_summary + "\n\n";
                   }
 
-                  // Full Report
                   if (finalResults.final_report) {
-                    if (y > 250) {
-                      pdf.addPage();
-                      y = 20;
-                    }
-                    pdf.setFontSize(16);
-                    pdf.text("Detailed Analysis", margin, y);
-                    y += 10;
-                    pdf.setFontSize(10);
-                    const reportLines = pdf.splitTextToSize(finalResults.final_report, pageWidth - margin * 2);
-
-                    // Add pages as needed
-                    for (let i = 0; i < reportLines.length; i++) {
-                      if (y > 280) {
-                        pdf.addPage();
-                        y = 20;
-                      }
-                      pdf.text(reportLines[i], margin, y);
-                      y += 6;
-                    }
+                    markdownContent += finalResults.final_report + "\n\n";
                   }
 
-                  pdf.save(`market-research-${sessionId.slice(0, 8)}.pdf`);
+                  if (finalResults.comparative_analysis?.analysis_text) {
+                    markdownContent += "## Comparative Analysis\n\n";
+                    markdownContent += finalResults.comparative_analysis.analysis_text + "\n\n";
+                  }
+
+                  // Download as markdown
+                  const blob = new Blob([markdownContent], { type: 'text/markdown' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `research-report-${sessionId.slice(0, 8)}.md`;
+                  a.click();
+                  URL.revokeObjectURL(url);
                 }}
                 className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-3 rounded-lg font-semibold"
               >
-                Download Report (PDF)
+                Download Report (.md)
               </button>
 
               <button
@@ -189,10 +169,11 @@ export default function ResearchPage({ params }: PageProps) {
                   a.href = url;
                   a.download = `research-data-${sessionId.slice(0, 8)}.json`;
                   a.click();
+                  URL.revokeObjectURL(url);
                 }}
                 className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold"
               >
-                Download Data (JSON)
+                Download Data (.json)
               </button>
             </div>
           </div>
