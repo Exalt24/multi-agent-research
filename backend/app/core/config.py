@@ -14,29 +14,17 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-    # LLM Configuration
+    # Secrets (MUST be in .env)
     groq_api_key: str = ""
-    ollama_base_url: str = "http://localhost:11434"
-    default_llm_model: str = "llama3.3-70b-versatile"  # Groq model
-    local_llm_model: str = "llama3"  # Ollama model
-
-    # Vector Database
-    qdrant_url: str = "http://localhost:6333"
-    qdrant_api_key: str = ""
-    qdrant_collection: str = "market_research"
-
-    # Redis
-    redis_url: str = "redis://localhost:6379"
-    redis_password: str = ""
-
-    # External APIs
     tavily_api_key: str = ""
-
-    # RAG Integration (Project 1)
-    rag_api_url: str = "https://enterprise-rag-api.onrender.com/api"
-
-    # Application
+    redis_url: str = ""
     environment: str = "development"
+
+    # Constants (hardcoded defaults, rarely change)
+    ollama_base_url: str = "http://localhost:11434"
+    rag_api_url: str = "https://enterprise-rag-api.onrender.com/api"
+    default_llm_model: str = "llama3.3-70b-versatile"
+    local_llm_model: str = "llama3"
     log_level: str = "INFO"
     max_parallel_agents: int = 2
     agent_timeout: int = 120
