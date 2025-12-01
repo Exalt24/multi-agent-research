@@ -29,7 +29,8 @@ export function useWebSocket(sessionId: string) {
   const connect = useCallback(() => {
     if (!sessionId) return;
 
-    const ws = new WebSocket(`ws://localhost:8000/ws/research/${sessionId}`);
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
+    const ws = new WebSocket(`${wsUrl}/ws/research/${sessionId}`);
 
     ws.onopen = () => {
       console.log("WebSocket connected");
