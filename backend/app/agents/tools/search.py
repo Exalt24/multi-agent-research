@@ -4,10 +4,7 @@ import os
 from typing import List, Dict, Any, Optional
 from langchain_core.tools import tool
 from tavily import TavilyClient
-try:
-    from ddgs import DDGS  # New package name
-except ImportError:
-    from duckduckgo_search import DDGS  # Fallback for old name
+from ddgs import DDGS
 import requests
 from bs4 import BeautifulSoup
 from ..state import MarketResearchState
