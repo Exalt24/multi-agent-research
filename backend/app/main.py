@@ -100,7 +100,8 @@ async def start_research(request: ResearchRequest):
                 final_state = await run_research(
                     query=request.query,
                     companies=request.companies,
-                    analysis_depth=request.analysis_depth
+                    analysis_depth=request.analysis_depth,
+                    session_id=session_id
                 )
                 print(f">>> Research completed for session {session_id}")
             except Exception as e:
