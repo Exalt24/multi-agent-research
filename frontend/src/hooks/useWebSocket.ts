@@ -46,10 +46,11 @@ export function useWebSocket(sessionId: string) {
         const message: WebSocketMessage = JSON.parse(event.data);
 
         if (message.type === "agent_status" && message.agent) {
+          const agentName = message.agent as string; // Type assertion
           setAgentStatuses((prev) => ({
             ...prev,
-            [message.agent]: {
-              agent: message.agent,
+            [agentName]: {
+              agent: agentName,
               status: message.status || "unknown",
               progress: message.progress || 0,
               message: message.message || "",
