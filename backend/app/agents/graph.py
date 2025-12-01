@@ -105,7 +105,8 @@ def create_research_graph(ws_manager=None):
 async def run_research(
     query: str,
     companies: List[str],
-    analysis_depth: str = "standard"
+    analysis_depth: str = "standard",
+    session_id: str = None
 ) -> Dict:
     """Run complete research workflow with all 7 agents.
 
@@ -135,7 +136,7 @@ async def run_research(
         "visualizations": [],
         "final_report": "",
         "executive_summary": "",
-        "session_id": str(uuid.uuid4()),
+        "session_id": session_id or str(uuid.uuid4()),
         "started_at": datetime.utcnow().isoformat(),
         "completed_at": "",
         "errors": [],
