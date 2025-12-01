@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 
 interface ResearchResults {
   competitor_profiles: Record<string, { analysis: string; sources: string[] }>;
@@ -35,100 +35,115 @@ interface WebSocketMessage {
 }
 
 export function useWebSocket(sessionId: string) {
-  const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
+  const [agentStatuses, setAgentStatuses] = useState<
+    Record<string, AgentStatus>
+  >({});
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [finalResults, setFinalResults] = useState<ResearchResults | null>(null);
+  const [finalResults, setFinalResults] = useState<ResearchResults | null>(
+    null
+  );
   const [workflowComplete, setWorkflowComplete] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const workflowCompleteRef = useRef(false);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const connect = useCallback(() => {
+  useEffect(() => {
     if (!sessionId) {
       console.error("Cannot connect: sessionId is missing");
       return;
     }
 
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
-    const fullUrl = `${wsUrl}/ws/research/${sessionId}`;
+    const connectWebSocket = () => {
+      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
+      const fullUrl = `${wsUrl}/ws/research/${sessionId}`;
 
-    console.log("Connecting to WebSocket:", fullUrl);
-    console.log("Session ID:", sessionId);
+      console.log("Connecting to WebSocket:", fullUrl);
+      console.log("Session ID:", sessionId);
 
-    const ws = new WebSocket(fullUrl);
+      const ws = new WebSocket(fullUrl);
 
-    ws.onopen = () => {
-      console.log("WebSocket connected");
-      setIsConnected(true);
-      setError(null);
-    };
+      ws.onopen = () => {
+        console.log("WebSocket connected");
+        setIsConnected(true);
+        setError(null);
+      };
 
-    ws.onmessage = (event) => {
-      try {
-        const message: WebSocketMessage = JSON.parse(event.data);
+      ws.onmessage = (event) => {
+        try {
+          const message: WebSocketMessage = JSON.parse(event.data);
 
-        if (message.type === "agent_status" && message.agent) {
-          const agentName = message.agent;
-          setAgentStatuses((prev) => ({
-            ...prev,
-            [agentName]: {
-              agent: agentName,
-              status: message.status || "unknown",
-              progress: message.progress || 0,
-              message: message.message || "",
-              data: (message.data as Record<string, unknown>) || {},
-              timestamp: message.timestamp || Date.now(),
-            },
-          }));
-        } else if (message.type === "workflow_complete") {
-          setWorkflowComplete(true);
-          workflowCompleteRef.current = true;
-          setFinalResults((message.data as ResearchResults) || null);
-        } else if (message.type === "workflow_failed") {
-          setError(message.error || "Workflow failed");
+          if (message.type === "agent_status" && message.agent) {
+            const agentName = message.agent;
+            setAgentStatuses((prev) => ({
+              ...prev,
+              [agentName]: {
+                agent: agentName,
+                status: message.status || "unknown",
+                progress: message.progress || 0,
+                message: message.message || "",
+                data: (message.data as Record<string, unknown>) || {},
+                timestamp: message.timestamp || Date.now(),
+              },
+            }));
+          } else if (message.type === "workflow_complete") {
+            setWorkflowComplete(true);
+            workflowCompleteRef.current = true;
+            setFinalResults((message.data as ResearchResults) || null);
+          } else if (message.type === "workflow_failed") {
+            setError(message.error || "Workflow failed");
+          }
+        } catch (err) {
+          console.error("Failed to parse WebSocket message:", err);
         }
-      } catch (err) {
-        console.error("Failed to parse WebSocket message:", err);
-      }
-    };
+      };
 
-    ws.onerror = (event) => {
-      console.error("WebSocket error:", event);
-      console.error("WebSocket URL was:", fullUrl);
-      console.error("Session ID:", sessionId);
-      // Don't set error state - let it reconnect automatically
-    };
+      ws.onerror = (event) => {
+        console.error("WebSocket error:", event);
+        console.error("WebSocket URL was:", fullUrl);
+        console.error("Session ID:", sessionId);
+        // Don't set error state - let it reconnect automatically
+      };
 
-    ws.onclose = (event) => {
-      console.log("WebSocket disconnected. Code:", event.code, "Reason:", event.reason);
-      setIsConnected(false);
+      ws.onclose = (event) => {
+        console.log(
+          "WebSocket disconnected. Code:",
+          event.code,
+          "Reason:",
+          event.reason
+        );
+        setIsConnected(false);
 
-      // Auto-reconnect after 2 seconds (faster than before)
-      setTimeout(() => {
-        if (wsRef.current === ws && !workflowCompleteRef.current) {
-          console.log("Attempting reconnect...");
-          connect();
+        // Auto-reconnect after 2 seconds if workflow not complete
+        if (!workflowCompleteRef.current) {
+          reconnectTimeoutRef.current = setTimeout(() => {
+            if (!workflowCompleteRef.current) {
+              console.log("Attempting reconnect...");
+              connectWebSocket();
+            }
+          }, 2000);
         }
-      }, 2000);
+      };
+
+      wsRef.current = ws;
     };
 
-    wsRef.current = ws;
-  }, [sessionId]);
-
-  useEffect(() => {
     // Small delay to let backend initialize session
     const timer = setTimeout(() => {
-      connect();
+      connectWebSocket();
     }, 500);
 
     return () => {
       clearTimeout(timer);
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
       }
     };
-  }, [connect]);
+  }, [sessionId]);
 
   return {
     agentStatuses,
