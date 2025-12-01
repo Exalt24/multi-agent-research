@@ -45,16 +45,16 @@ export function useWebSocket(sessionId: string) {
       try {
         const message: WebSocketMessage = JSON.parse(event.data);
 
-        if (message.type === "agent_status") {
+        if (message.type === "agent_status" && message.agent) {
           setAgentStatuses((prev) => ({
             ...prev,
             [message.agent]: {
               agent: message.agent,
-              status: message.status,
-              progress: message.progress,
-              message: message.message,
-              data: message.data,
-              timestamp: message.timestamp,
+              status: message.status || "unknown",
+              progress: message.progress || 0,
+              message: message.message || "",
+              data: message.data || {},
+              timestamp: message.timestamp || Date.now(),
             },
           }));
         } else if (message.type === "workflow_complete") {
