@@ -3,6 +3,8 @@
 import { use } from "react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import AgentCard from "@/components/AgentCard";
+import ReactMarkdown from "react-markdown";
+import jsPDF from "jspdf";
 
 interface PageProps {
   params: Promise<{ sessionId: string }>;
@@ -105,10 +107,8 @@ export default function ResearchPage({ params }: PageProps) {
             {finalResults.final_report && (
               <div className="mb-6">
                 <h3 className="text-lg font-semibold mb-2">Full Report</h3>
-                <div className="prose prose-invert max-w-none">
-                  <pre className="whitespace-pre-wrap text-sm text-gray-300 bg-gray-900/50 p-4 rounded">
-                    {finalResults.final_report}
-                  </pre>
+                <div className="prose prose-invert max-w-none bg-gray-900/50 p-6 rounded-lg">
+                  <ReactMarkdown>{finalResults.final_report}</ReactMarkdown>
                 </div>
               </div>
             )}
@@ -126,20 +126,75 @@ export default function ResearchPage({ params }: PageProps) {
               </div>
             )}
 
-            {/* Download Button */}
-            <button
-              onClick={() => {
-                const blob = new Blob([JSON.stringify(finalResults, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `research-${sessionId}.json`;
-                a.click();
-              }}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold"
-            >
-              Download Results (JSON)
-            </button>
+            {/* Download Buttons */}
+            <div className="flex gap-4">
+              <button
+                onClick={() => {
+                  const pdf = new jsPDF();
+                  const pageWidth = pdf.internal.pageSize.getWidth();
+                  const margin = 20;
+                  let y = 20;
+
+                  // Title
+                  pdf.setFontSize(20);
+                  pdf.text("Market Research Report", margin, y);
+                  y += 15;
+
+                  // Executive Summary
+                  if (finalResults.executive_summary) {
+                    pdf.setFontSize(16);
+                    pdf.text("Executive Summary", margin, y);
+                    y += 10;
+                    pdf.setFontSize(11);
+                    const summaryLines = pdf.splitTextToSize(finalResults.executive_summary, pageWidth - margin * 2);
+                    pdf.text(summaryLines, margin, y);
+                    y += (summaryLines.length * 7) + 10;
+                  }
+
+                  // Full Report
+                  if (finalResults.final_report) {
+                    if (y > 250) {
+                      pdf.addPage();
+                      y = 20;
+                    }
+                    pdf.setFontSize(16);
+                    pdf.text("Detailed Analysis", margin, y);
+                    y += 10;
+                    pdf.setFontSize(10);
+                    const reportLines = pdf.splitTextToSize(finalResults.final_report, pageWidth - margin * 2);
+
+                    // Add pages as needed
+                    for (let i = 0; i < reportLines.length; i++) {
+                      if (y > 280) {
+                        pdf.addPage();
+                        y = 20;
+                      }
+                      pdf.text(reportLines[i], margin, y);
+                      y += 6;
+                    }
+                  }
+
+                  pdf.save(`market-research-${sessionId.slice(0, 8)}.pdf`);
+                }}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-3 rounded-lg font-semibold"
+              >
+                Download Report (PDF)
+              </button>
+
+              <button
+                onClick={() => {
+                  const blob = new Blob([JSON.stringify(finalResults, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `research-data-${sessionId.slice(0, 8)}.json`;
+                  a.click();
+                }}
+                className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold"
+              >
+                Download Data (JSON)
+              </button>
+            </div>
           </div>
         )}
       </div>
