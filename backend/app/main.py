@@ -82,38 +82,39 @@ async def start_research(request: ResearchRequest):
         request: Research request with query and companies
 
     Returns:
-        Research results
+        Session ID to connect to WebSocket for real-time updates
     """
+    import asyncio
+    import uuid
+
     try:
         print(f">>> Starting research: {request.query}")
         print(f"Companies: {', '.join(request.companies)}")
 
-        # Run research workflow
-        final_state = await run_research(
-            query=request.query,
-            companies=request.companies,
-            analysis_depth=request.analysis_depth
-        )
+        # Generate session ID
+        session_id = str(uuid.uuid4())
 
-        # Check for errors
-        errors = final_state.get("errors", [])
-        if errors:
-            error_messages = [e.get("error", "") for e in errors]
-            raise HTTPException(
-                status_code=500,
-                detail=f"Research failed: {'; '.join(error_messages)}"
-            )
+        # Run research in background task
+        async def run_in_background():
+            try:
+                final_state = await run_research(
+                    query=request.query,
+                    companies=request.companies,
+                    analysis_depth=request.analysis_depth
+                )
+                print(f">>> Research completed for session {session_id}")
+            except Exception as e:
+                print(f">>> Research failed for session {session_id}: {e}")
 
-        # Return results
+        # Start background task
+        asyncio.create_task(run_in_background())
+
+        # Return immediately with session ID
         return ResearchResponse(
-            session_id=final_state.get("session_id", ""),
-            status="completed",
-            message=f"Successfully researched {len(request.companies)} companies",
-            data={
-                "competitor_profiles": final_state.get("competitor_profiles", {}),
-                "research_findings": final_state.get("research_findings", []),
-                "cost_tracking": final_state.get("cost_tracking", {})
-            }
+            session_id=session_id,
+            status="started",
+            message=f"Research started for {len(request.companies)} companies. Connect to WebSocket for updates.",
+            data={}
         )
 
     except HTTPException:
