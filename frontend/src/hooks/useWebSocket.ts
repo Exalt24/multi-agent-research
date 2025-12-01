@@ -24,6 +24,8 @@ export function useWebSocket(sessionId: string) {
   const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [finalResults, setFinalResults] = useState<any>(null);
+  const [workflowComplete, setWorkflowComplete] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
 
   const connect = useCallback(() => {
@@ -54,6 +56,11 @@ export function useWebSocket(sessionId: string) {
               timestamp: message.timestamp,
             },
           }));
+        } else if (message.type === "workflow_complete") {
+          setWorkflowComplete(true);
+          setFinalResults(message.data);
+        } else if (message.type === "workflow_failed") {
+          setError(message.error || "Workflow failed");
         }
       } catch (err) {
         console.error("Failed to parse WebSocket message:", err);
@@ -96,5 +103,7 @@ export function useWebSocket(sessionId: string) {
     agentStatuses,
     isConnected,
     error,
+    finalResults,
+    workflowComplete,
   };
 }
