@@ -71,6 +71,8 @@ export function useWebSocket(sessionId: string) {
 
     ws.onerror = (event) => {
       console.error("WebSocket error:", event);
+      console.error("WebSocket URL was:", `${wsUrl}/ws/research/${sessionId}`);
+      console.error("Session ID:", sessionId);
       setError("WebSocket connection error");
     };
 
