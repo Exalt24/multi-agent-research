@@ -104,8 +104,28 @@ async def start_research(request: ResearchRequest):
                     session_id=session_id
                 )
                 print(f">>> Research completed for session {session_id}")
+
+                # Send final results via WebSocket
+                await ws_manager.send_update(session_id, {
+                    "type": "workflow_complete",
+                    "session_id": session_id,
+                    "status": "completed",
+                    "data": {
+                        "competitor_profiles": final_state.get("competitor_profiles", {}),
+                        "comparative_analysis": final_state.get("comparative_analysis", {}),
+                        "executive_summary": final_state.get("executive_summary", ""),
+                        "final_report": final_state.get("final_report", ""),
+                        "visualizations": final_state.get("visualizations", []),
+                        "cost_tracking": final_state.get("cost_tracking", {})
+                    }
+                })
             except Exception as e:
                 print(f">>> Research failed for session {session_id}: {e}")
+                await ws_manager.send_update(session_id, {
+                    "type": "workflow_failed",
+                    "session_id": session_id,
+                    "error": str(e)
+                })
 
         # Start background task
         asyncio.create_task(run_in_background())
