@@ -2,8 +2,8 @@
 
 **AI-powered competitive intelligence using 7 specialized agents orchestrated with LangGraph**
 
-🔗 **Live Demo (Frontend):** https://frontend-g5urynyrg-exalt24s-projects.vercel.app
-📘 **GitHub:** https://github.com/Exalt24/multi-agent-research
+🔗 **Live Demo:** https://multi-agent-research-frontend.vercel.app
+⚙️ **API Endpoint:** https://multi-agent-research-api.onrender.com
 
 ---
 
@@ -242,9 +242,7 @@ curl -X POST http://localhost:8000/api/research \
 
 ### Deploy Frontend to Vercel
 
-**Already deployed!** https://frontend-g5urynyrg-exalt24s-projects.vercel.app
-
-To redeploy:
+Via Vercel Dashboard or CLI:
 ```bash
 cd frontend
 vercel --prod --yes
@@ -560,15 +558,11 @@ vercel --prod --yes
 
 ---
 
-## Integration with Project 1 (Enterprise RAG)
+## RAG Integration (Optional)
 
-This platform integrates with the Enterprise RAG Knowledge Base:
-- **Agent:** Web Research Agent
-- **Use Case:** Queries existing knowledge before web search
-- **API Endpoint:** `https://enterprise-rag-api.onrender.com/api/query`
-- **Benefit:** Reduces redundant searches, leverages historical data
+The Web Research Agent can optionally integrate with an external RAG (Retrieval-Augmented Generation) API to check existing knowledge before performing web searches. This reduces redundant searches and leverages historical data.
 
-**Microservices Architecture:** Agents can call Project 1's RAG API as a tool, demonstrating composable AI systems.
+Configure via `RAG_API_URL` in `backend/app/core/config.py`.
 
 ---
 
@@ -644,15 +638,10 @@ python test_api.py
 
 ---
 
-## Credits
-
-Built by Daniel Alexis Cruz as Project 2 in AI Automation Portfolio
-
-**Related Projects:**
-- [Project 1: Enterprise RAG Knowledge Base](https://github.com/Exalt24/enterprise-rag-knowledge-base)
-
----
-
 ## License
 
-MIT
+MIT License - see LICENSE file for details
+
+## Contributing
+
+Contributions welcome! Please open an issue or submit a pull request.
