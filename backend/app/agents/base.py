@@ -26,17 +26,19 @@ class BaseAgent(ABC):
         tools: Optional[List[BaseTool]] = None,
         max_retries: int = 3,
         timeout: int = 120,
+        ws_manager = None,  # WebSocket manager
     ):
         self.name = name
         self.llm = llm
         self.tools = tools or []
         self.max_retries = max_retries
         self.timeout = timeout
-        self._websocket_callback = None
+        self._ws_manager = ws_manager
+        self._session_id = None
 
-    def set_websocket_callback(self, callback):
-        """Set callback for WebSocket updates."""
-        self._websocket_callback = callback
+    def set_session(self, session_id: str):
+        """Set the session ID for WebSocket updates."""
+        self._session_id = session_id
 
     async def _emit_status(
         self,
@@ -46,16 +48,15 @@ class BaseAgent(ABC):
         data: Optional[Dict[str, Any]] = None
     ):
         """Emit status update via WebSocket."""
-        if self._websocket_callback:
-            await self._websocket_callback({
-                "type": "agent_progress",
-                "agent": self.name,
-                "status": status,
-                "progress": progress,
-                "message": message,
-                "data": data or {},
-                "timestamp": time.time()
-            })
+        if self._ws_manager and self._session_id:
+            await self._ws_manager.broadcast_agent_status(
+                session_id=self._session_id,
+                agent=self.name,
+                status=status,
+                progress=progress,
+                message=message,
+                data=data or {}
+            )
 
     async def execute(self, state: MarketResearchState) -> Dict[str, Any]:
         """Execute agent with retry logic.
@@ -66,6 +67,9 @@ class BaseAgent(ABC):
         Returns:
             Updated state fields
         """
+        # Extract session_id from state for WebSocket updates
+        self._session_id = state.get("session_id", "")
+
         await self._emit_status("running", 0, f"{self.name} starting...")
 
         for attempt in range(self.max_retries):
