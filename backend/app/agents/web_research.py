@@ -40,6 +40,8 @@ class WebResearchAgent(BaseAgent):
         self.analysis_prompt = ChatPromptTemplate.from_messages([
             ("system", """You are a web research analyst gathering competitive intelligence.
 
+CRITICAL: Output MUST be in clean markdown format with proper structure.
+
 Analyze the search results and extract:
 1. Product features and capabilities
 2. Pricing information (plans, pricing tiers)
@@ -47,39 +49,57 @@ Analyze the search results and extract:
 4. Strengths and unique selling points
 5. Customer sentiment from reviews
 
-Be factual and cite sources. If information isn't found, say so clearly."""),
+Be factual and cite sources. If information isn't found, say so clearly.
+
+FORMATTING RULES:
+- Use ## for section headers (H2)
+- Use - for bullet lists
+- Add blank line after headers
+- Add blank line between sections
+- Use **bold** for key terms
+- Keep it concise and readable"""),
             ("human", """Company: {company}
 Query: {query}
 
 Search Results:
 {search_results}
 
-Provide a structured analysis in this format:
+Provide a structured analysis using this EXACT format:
 
 ## Product Overview
-[Brief description]
+
+[Brief 2-3 sentence description]
 
 ## Key Features
+
 - Feature 1
 - Feature 2
-...
+- Feature 3
 
 ## Pricing
-[Pricing information if found, or "Not found in search results"]
+
+[Pricing information, or "Not found in search results"]
 
 ## Target Market
-[Who uses this product]
+
+[1-2 sentences about who uses this product]
 
 ## Strengths
+
 - Strength 1
 - Strength 2
+- Strength 3
 
 ## Recent News
-[Recent developments if any]
+
+[Recent developments or "No recent news found"]
 
 ## Sources
-[List URLs]
-""")
+
+- [URL 1]
+- [URL 2]
+
+Follow this structure exactly with proper markdown formatting.""")
         ])
 
     async def _process(self, state: MarketResearchState) -> Dict[str, Any]:

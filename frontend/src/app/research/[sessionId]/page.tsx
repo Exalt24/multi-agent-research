@@ -4,6 +4,9 @@ import { use } from "react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import AgentCard from "@/components/AgentCard";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
 
 interface PageProps {
   params: Promise<{ sessionId: string }>;
@@ -106,8 +109,46 @@ export default function ResearchPage({ params }: PageProps) {
             {finalResults.final_report && (
               <div className="mb-6">
                 <h3 className="text-lg font-semibold mb-2">Full Report</h3>
-                <div className="prose prose-invert max-w-none bg-gray-900/50 p-6 rounded-lg">
-                  <ReactMarkdown>{finalResults.final_report}</ReactMarkdown>
+                <div className="prose prose-invert prose-lg max-w-none bg-gray-900/50 p-8 rounded-lg">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                    components={{
+                      // Custom styling for better readability
+                      h1: ({ node, ...props }) => <h1 className="text-3xl font-bold mb-6 mt-8 text-blue-300 border-b border-blue-800 pb-2" {...props} />,
+                      h2: ({ node, ...props }) => <h2 className="text-2xl font-bold mb-4 mt-6 text-blue-400" {...props} />,
+                      h3: ({ node, ...props }) => <h3 className="text-xl font-semibold mb-3 mt-5 text-purple-400" {...props} />,
+                      h4: ({ node, ...props }) => <h4 className="text-lg font-semibold mb-2 mt-4 text-purple-300" {...props} />,
+                      p: ({ node, ...props }) => <p className="mb-4 leading-relaxed text-gray-200" {...props} />,
+                      ul: ({ node, ...props }) => <ul className="mb-4 ml-6 space-y-2 list-disc list-outside" {...props} />,
+                      ol: ({ node, ...props }) => <ol className="mb-4 ml-6 space-y-2 list-decimal list-outside" {...props} />,
+                      li: ({ node, ...props }) => <li className="text-gray-200 leading-relaxed" {...props} />,
+                      table: ({ node, ...props }) => (
+                        <div className="overflow-x-auto my-6">
+                          <table className="min-w-full divide-y divide-gray-700 border border-gray-700" {...props} />
+                        </div>
+                      ),
+                      thead: ({ node, ...props }) => <thead className="bg-gray-800" {...props} />,
+                      th: ({ node, ...props }) => <th className="px-4 py-3 text-left text-sm font-semibold text-blue-300" {...props} />,
+                      td: ({ node, ...props }) => <td className="px-4 py-3 text-sm text-gray-200 border-t border-gray-700" {...props} />,
+                      blockquote: ({ node, ...props }) => (
+                        <blockquote className="border-l-4 border-blue-500 pl-4 my-4 italic text-gray-300 bg-gray-800/50 py-2" {...props} />
+                      ),
+                      code: ({ node, inline, ...props }: any) =>
+                        inline ? (
+                          <code className="bg-gray-800 text-blue-300 px-1.5 py-0.5 rounded text-sm font-mono" {...props} />
+                        ) : (
+                          <code className="block bg-gray-800 text-green-300 p-4 rounded-lg overflow-x-auto text-sm font-mono my-4" {...props} />
+                        ),
+                      pre: ({ node, ...props }) => <pre className="bg-gray-800 rounded-lg overflow-x-auto my-4" {...props} />,
+                      a: ({ node, ...props }) => <a className="text-blue-400 hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer" {...props} />,
+                      hr: ({ node, ...props }) => <hr className="my-6 border-gray-700" {...props} />,
+                      strong: ({ node, ...props }) => <strong className="font-bold text-white" {...props} />,
+                      em: ({ node, ...props }) => <em className="italic text-gray-300" {...props} />,
+                    }}
+                  >
+                    {finalResults.final_report}
+                  </ReactMarkdown>
                 </div>
               </div>
             )}
@@ -115,13 +156,30 @@ export default function ResearchPage({ params }: PageProps) {
             {/* Competitor Profiles */}
             {finalResults.competitor_profiles && Object.keys(finalResults.competitor_profiles).length > 0 && (
               <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-2">Competitor Profiles</h3>
-                {Object.entries(finalResults.competitor_profiles).map(([company, profile]: [string, any]) => (
-                  <div key={company} className="mb-4 p-4 bg-gray-900/50 rounded">
-                    <h4 className="font-semibold text-blue-400 mb-2">{company}</h4>
-                    <pre className="whitespace-pre-wrap text-sm text-gray-300">{profile.analysis}</pre>
-                  </div>
-                ))}
+                <h3 className="text-lg font-semibold mb-4">Competitor Profiles</h3>
+                <div className="space-y-4">
+                  {Object.entries(finalResults.competitor_profiles).map(([company, profile]: [string, any]) => (
+                    <div key={company} className="bg-gray-900/50 rounded-lg p-6 border border-gray-700">
+                      <h4 className="text-xl font-bold text-blue-400 mb-4 border-b border-blue-900 pb-2">{company}</h4>
+                      <div className="prose prose-invert max-w-none">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                          components={{
+                            h2: ({ node, ...props }) => <h2 className="text-lg font-semibold mb-2 mt-4 text-purple-400" {...props} />,
+                            h3: ({ node, ...props }) => <h3 className="text-base font-semibold mb-2 mt-3 text-purple-300" {...props} />,
+                            p: ({ node, ...props }) => <p className="mb-3 text-gray-300 leading-relaxed" {...props} />,
+                            ul: ({ node, ...props }) => <ul className="mb-3 ml-5 space-y-1 list-disc" {...props} />,
+                            li: ({ node, ...props }) => <li className="text-gray-300" {...props} />,
+                            strong: ({ node, ...props }) => <strong className="text-white font-semibold" {...props} />,
+                          }}
+                        >
+                          {profile.analysis}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

@@ -46,15 +46,42 @@ Write an executive summary.""")
         self.report_prompt = ChatPromptTemplate.from_messages([
             ("system", """You are a research analyst writing comprehensive market research reports.
 
-Structure the report with:
-1. Executive Summary
-2. Research Methodology
-3. Competitive Analysis (from analyst)
-4. Key Findings
-5. Recommendations
-6. Appendix (sources)
+CRITICAL: Use STRICT markdown formatting. Every section MUST start with proper headers.
 
-Use professional markdown formatting with headers, tables, and bullet points."""),
+Required structure (use these EXACT headers):
+
+# Market Research Report
+
+## Executive Summary
+[2-3 paragraphs here]
+
+## Research Methodology
+[Brief methodology]
+
+## Competitive Analysis
+{analysis}
+
+## Key Findings
+- Finding 1
+- Finding 2
+- Finding 3
+
+## Recommendations
+1. Recommendation 1
+2. Recommendation 2
+
+## Appendix: Sources
+- Source 1
+- Source 2
+
+FORMATTING RULES:
+- Use ## for main sections (not # or ###)
+- Use - for unordered lists
+- Use 1. 2. 3. for ordered lists
+- Use **bold** for emphasis
+- Add blank lines between sections
+- Use tables with | for comparisons
+- NO nested headers without content"""),
             ("human", """Query: {query}
 Companies: {companies}
 
@@ -64,7 +91,7 @@ Research Findings:
 Comparative Analysis:
 {analysis}
 
-Create a comprehensive research report.""")
+Create a comprehensive research report following the EXACT structure above.""")
         ])
 
     async def _process(self, state: MarketResearchState) -> Dict[str, Any]:
