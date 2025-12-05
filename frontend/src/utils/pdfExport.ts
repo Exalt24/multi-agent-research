@@ -105,21 +105,15 @@ export async function exportToPDF(
 
   pdf.setFontSize(12);
   pdf.setFont("helvetica", "normal");
-  pdf.text(
-    `Generated: ${new Date().toLocaleDateString()}`,
-    pageWidth / 2,
-    80,
-    { align: "center" }
-  );
+  pdf.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth / 2, 80, {
+    align: "center",
+  });
 
   pdf.setFontSize(10);
   pdf.setTextColor(100, 100, 100);
-  pdf.text(
-    `Session ID: ${data.sessionId.slice(0, 8)}`,
-    pageWidth / 2,
-    90,
-    { align: "center" }
-  );
+  pdf.text(`Session ID: ${data.sessionId.slice(0, 8)}`, pageWidth / 2, 90, {
+    align: "center",
+  });
 
   pdf.setTextColor(0, 0, 0);
   pdf.addPage();
@@ -176,7 +170,10 @@ export async function exportToPDF(
   }
 
   // Competitor Profiles
-  if (data.competitor_profiles && Object.keys(data.competitor_profiles).length > 0) {
+  if (
+    data.competitor_profiles &&
+    Object.keys(data.competitor_profiles).length > 0
+  ) {
     checkPageBreak(30);
     addHeading("Competitor Profiles", 1);
     addLine();
@@ -198,7 +195,11 @@ export async function exportToPDF(
 
     // Capture charts as images
     const chartElements = document.querySelectorAll("canvas");
-    for (let i = 0; i < Math.min(chartElements.length, data.visualizations.length); i++) {
+    for (
+      let i = 0;
+      i < Math.min(chartElements.length, data.visualizations.length);
+      i++
+    ) {
       try {
         const canvas = chartElements[i] as HTMLCanvasElement;
         const imgData = canvas.toDataURL("image/png");
@@ -232,12 +233,9 @@ export async function exportToPDF(
     pdf.setPage(i);
     pdf.setFontSize(9);
     pdf.setTextColor(150, 150, 150);
-    pdf.text(
-      `Page ${i} of ${totalPages}`,
-      pageWidth / 2,
-      pageHeight - 10,
-      { align: "center" }
-    );
+    pdf.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, {
+      align: "center",
+    });
     pdf.text(
       "Multi-Agent Market Research Platform",
       pageWidth / 2,

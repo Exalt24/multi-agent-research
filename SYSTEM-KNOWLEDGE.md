@@ -67,20 +67,28 @@ fact_checker → content_synthesizer (20s) ↘
 
 ```python
 class MarketResearchState(TypedDict):
-    # Accumulates across agents
+    # Accumulates across agents (parallel-safe with operator.add)
     research_findings: Annotated[List[Dict], operator.add]
+    current_agent: Annotated[List[str], operator.add]  # Tracks all active agents
+    cost_tracking: Annotated[List[Dict], operator.add]  # Per-agent cost info
     errors: Annotated[List[Dict], operator.add]
+    fact_check_results: Annotated[List[Dict], operator.add]
+    visualizations: Annotated[List[Dict], operator.add]
+    messages: Annotated[List[BaseMessage], operator.add]
 
-    # Overwritten by agents
+    # Overwritten by agents (last-write-wins)
     comparative_analysis: Dict[str, Any]
     final_report: str
+    current_phase: str  # One agent per parallel pair updates
 ```
 
 **Why this pattern:**
 - **Type safety** - TypedDict provides IDE autocomplete and type checking
-- **Accumulation** - operator.add appends to lists (research from multiple sources)
+- **Parallel safety** - operator.add concatenates lists from parallel agents automatically
+- **Complete tracking** - current_agent shows ["Web Research", "Financial Intel"] during parallel execution
+- **Cost preservation** - All 7 agent costs saved (not just sequential agents)
 - **Clarity** - Explicit state schema visible in one file
-- **LangGraph native** - This is the recommended pattern
+- **LangGraph native** - This is the recommended pattern for concurrent updates
 
 ---
 

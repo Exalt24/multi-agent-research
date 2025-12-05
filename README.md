@@ -466,11 +466,16 @@ All agents share a single `MarketResearchState` (TypedDict) that accumulates:
 - Fact-check results (with operator.add)
 - Final report + executive summary
 - Visualizations (Chart.js specs, with operator.add)
-- Cost tracking (per-agent breakdown with accurate token counts)
+- **Active agents** (current_agent: List[str] with operator.add - shows which agents are running, including parallel pairs)
+- **Cost tracking** (cost_tracking: List[Dict] with operator.add - per-agent cost info from all 7 agents)
 - Errors (with operator.add for parallel error collection)
 - HITL state (pending approvals, responses)
 
-**operator.add pattern:** Fields marked with `Annotated[List[T], operator.add]` automatically concatenate when multiple agents write to them in parallel - critical for parallel execution safety!
+**operator.add pattern:** Fields marked with `Annotated[List[T], operator.add]` automatically concatenate when multiple agents write to them in parallel. Critical for parallel execution:
+- `current_agent` accumulates all active agents (shows "2 agents running" during parallel stages)
+- `cost_tracking` preserves costs from all agents including those running in parallel
+- `errors` collects errors from any parallel agent without overwriting
+- `research_findings`, `fact_check_results`, `visualizations` all use this pattern
 
 LangGraph passes state through the workflow, each agent reads coordinator's guidance and updates relevant fields.
 

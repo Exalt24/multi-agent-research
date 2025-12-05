@@ -63,9 +63,6 @@ Required structure (use these EXACT headers):
 ## Executive Summary
 [2-3 paragraphs here]
 
-## Research Methodology
-[Brief methodology]
-
 ## Competitive Analysis
 {analysis}
 
@@ -81,6 +78,8 @@ Required structure (use these EXACT headers):
 ## Appendix: Sources
 - Source 1
 - Source 2
+
+Note: Research Strategy is handled separately by coordinator, so skip methodology section.
 
 FORMATTING RULES:
 - Use ## for main sections (not # or ###)
