@@ -213,7 +213,7 @@ Follow this structure exactly with proper markdown formatting.""",
 
         return {
             "financial_data": financial_data,
-            "current_agent": self.name,
+            # Don't update current_agent (runs in parallel with Web Research)
             "current_phase": "research",
             "cost_tracking": {**state.get("cost_tracking", {}), self.name: cost_info},
         }

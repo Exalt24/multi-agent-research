@@ -214,7 +214,7 @@ Create a comprehensive research report following the EXACT structure above.""")
         return {
             "executive_summary": executive_summary,
             "final_report": final_report,
-            "current_agent": self.name,
+            # Don't update current_agent (runs in parallel with Data Viz)
             "current_phase": "synthesis",
             "cost_tracking": {
                 **state.get("cost_tracking", {}),

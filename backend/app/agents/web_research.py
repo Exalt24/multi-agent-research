@@ -161,7 +161,7 @@ Follow this structure exactly with proper markdown formatting.""")
         return {
             "research_findings": findings,
             "competitor_profiles": profiles,
-            "current_agent": self.name,
+            # Don't update current_agent (runs in parallel with Financial Intel)
             "current_phase": "research",
             "cost_tracking": {
                 **state.get("cost_tracking", {}),
