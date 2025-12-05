@@ -162,7 +162,7 @@ Generate the strategic research guidance in JSON format.""",
             "financial_priorities": financial_priorities,
             "comparison_angles": comparison_angles,
             "depth_settings": depth_settings,
-            "current_agent": self.name,
+            "current_agent": [self.name],  # List for operator.add
             "current_phase": "research",  # Move to research phase
             "workflow_status": "running",
             "cost_tracking": {**state.get("cost_tracking", {}), self.name: cost_info},
