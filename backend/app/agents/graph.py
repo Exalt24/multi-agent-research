@@ -204,7 +204,7 @@ async def run_research(
         "started_at": datetime.utcnow().isoformat(),
         "completed_at": "",
         "errors": [],
-        "cost_tracking": {},
+        "cost_tracking": [],  # List of per-agent cost dicts (parallel-safe with operator.add)
         "pending_approvals": [],
         "approval_responses": {}
     }

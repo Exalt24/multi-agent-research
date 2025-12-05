@@ -228,7 +228,7 @@ async def start_research(body: ResearchRequest, request: Request):
                         "executive_summary": final_state.get("executive_summary", ""),
                         "final_report": final_state.get("final_report", ""),
                         "visualizations": final_state.get("visualizations", []),
-                        "cost_tracking": final_state.get("cost_tracking", {})
+                        "cost_tracking": final_state.get("cost_tracking", [])
                     }
                 })
             except Exception as e:
