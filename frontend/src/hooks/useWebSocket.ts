@@ -11,7 +11,7 @@ interface ResearchResults {
     type: string;
     description: string;
   }>;
-  cost_tracking: Record<string, unknown>;
+  cost_tracking: Array<Record<string, any>>;  // List of per-agent cost info (parallel-safe)
 }
 
 interface AgentStatus {

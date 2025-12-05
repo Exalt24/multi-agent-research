@@ -153,10 +153,7 @@ Follow this structure exactly with proper markdown formatting.""")
                             "error": "Workflow stopped by user after fact-check review",
                             "timestamp": cost_info["timestamp"]
                         }],
-                        "cost_tracking": {
-                            **state.get("cost_tracking", {}),
-                            self.name: cost_info
-                        }
+                        "cost_tracking": [cost_info],  # List for operator.add (parallel-safe)
                     }
 
                 # User approved - continue with workflow
@@ -175,8 +172,5 @@ Follow this structure exactly with proper markdown formatting.""")
             "validated_claims": [],  # Could parse report into structured claims
             "current_agent": [self.name],  # List for operator.add
             "current_phase": "validation",
-            "cost_tracking": {
-                **state.get("cost_tracking", {}),
-                self.name: cost_info
-            }
+            "cost_tracking": [cost_info],  # List for operator.add (parallel-safe)
         }
