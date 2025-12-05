@@ -165,5 +165,5 @@ Generate the strategic research guidance in JSON format.""",
             "current_agent": [self.name],  # List for operator.add
             "current_phase": "research",  # Move to research phase
             "workflow_status": "running",
-            "cost_tracking": {**state.get("cost_tracking", {}), self.name: cost_info},
+            "cost_tracking": [cost_info],  # List for operator.add (parallel-safe)
         }

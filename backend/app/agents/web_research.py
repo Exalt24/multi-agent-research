@@ -163,10 +163,7 @@ Follow this structure exactly with proper markdown formatting.""")
             "competitor_profiles": profiles,
             "current_agent": [self.name],  # List for operator.add (parallel-safe)
             "current_phase": "research",
-            "cost_tracking": {
-                **state.get("cost_tracking", {}),
-                self.name: cost_info
-            }
+            "cost_tracking": [cost_info],  # List for operator.add (parallel-safe)
         }
 
     async def _research_company(self, company: str, query: str, state: MarketResearchState) -> Dict[str, Any]:
