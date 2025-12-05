@@ -571,7 +571,7 @@ async def test_complete_workflow():
 
 1. **Local LLMs (Ollama)** - Unlimited calls in dev, learn model optimization
 2. **Smart fallbacks** - Tavily → DuckDuckGo → Web scraping (quality → free)
-3. **Redis caching** - Upstash 10K commands/day is plenty for demos
+3. **Redis caching** - Free tier Redis (cloud providers offer various limits)
 4. **Batch operations** - Group searches to reduce API calls
 5. **Memory management** - Run on 512MB Render free tier
 
@@ -797,7 +797,7 @@ I also implemented search tool fallbacks - Tavily API fails? Use DuckDuckGo. Duc
 "I built this entire platform for $0/month using free tiers:
 - Groq for LLM (30 req/min free, 350+ tokens/sec)
 - Tavily for search (500/month free - protected with Redis caching and rate limiting)
-- Upstash Redis (10K commands/day for search result caching)
+- Redis Cloud (search result caching with 1-hour TTL)
 - Render for backend (750 hours/month)
 - Vercel for frontend (unlimited)
 
