@@ -84,7 +84,7 @@ class MarketResearchState(TypedDict):
     started_at: str
     completed_at: str
     errors: Annotated[List[Dict[str, Any]], operator.add]
-    cost_tracking: Dict[str, Any]  # tokens used, estimated cost
+    cost_tracking: Annotated[List[Dict[str, Any]], operator.add]  # Per-agent cost info (parallel-safe)
 
     # Human-in-the-Loop (HITL) - IMPLEMENTED
     # Workflow can pause for human approval when quality concerns detected.
