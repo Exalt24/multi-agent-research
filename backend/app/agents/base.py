@@ -223,7 +223,7 @@ class BaseAgent(ABC):
                 "error": user_friendly_msg,
                 "timestamp": time.time()
             }],
-            "current_agent": self.name,
+            "current_agent": [self.name],  # List for operator.add
         }
 
     def _count_tokens(self, text: str, model_name: Optional[str] = None) -> int:
