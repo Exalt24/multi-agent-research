@@ -14,7 +14,7 @@ A production-ready multi-agent AI system that automates market research and comp
 ### Key Metrics
 - **Time Reduction:** Manual research 6-8 hours → Agent system 1.75 minutes (200x+ faster with parallel execution)
 - **Agents:** 7 specialized agents with distinct roles (2 parallel execution stages)
-- **Cost:** $0/month (free tier APIs: Tavily, Groq, Upstash Redis)
+- **Cost:** $0/month (free tier APIs: Tavily, Groq, Redis Cloud)
 - **Real-Time:** WebSocket monitoring with Human-in-the-Loop approval gates
 - **Tech Stack:** LangGraph, FastAPI, Next.js 16, Ollama/Groq, Redis, Chart.js, tiktoken
 
@@ -310,7 +310,7 @@ NEXT_PUBLIC_WS_URL=wss://your-backend.onrender.com
 - **Agent Orchestration:** LangGraph (state machines)
 - **LLMs:** Ollama (local dev), Groq (cloud production)
 - **Search:** Tavily API (primary), DuckDuckGo (fallback)
-- **State Persistence:** Redis (Upstash Cloud)
+- **Search Caching:** Redis (cloud-hosted)
 - **Web Scraping:** BeautifulSoup4, requests
 - **RAG Integration:** Project 1 Enterprise RAG API
 
@@ -324,7 +324,7 @@ NEXT_PUBLIC_WS_URL=wss://your-backend.onrender.com
 ### Free Tier Services
 - **Groq:** 30 requests/min (LLM)
 - **Tavily:** 500/month (search - protected by Redis caching)
-- **Upstash Redis:** 10K commands/day (search result caching)
+- **Redis Cloud:** Free tier available (search result caching)
 - **Render:** 750 hours/month (backend)
 - **Vercel:** Unlimited (frontend)
 
@@ -574,7 +574,7 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8000              # Dev
 |---------|-----------|-------|------|
 | **Groq API** | 30 req/min | LLM inference | $0 |
 | **Tavily** | 500/month | Web search (with Redis caching to save quota) | $0 |
-| **Upstash Redis** | 10K cmd/day | Search result caching (1-hour TTL) | $0 |
+| **Redis Cloud** | Free tier (varies by provider) | Search result caching (1-hour TTL) | $0 |
 | **Render** | 750 hrs/month | Backend hosting | $0 |
 | **Vercel** | Unlimited | Frontend hosting | $0 |
 | **Ollama** | Unlimited | Local dev LLM | $0 |
@@ -649,7 +649,7 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8000              # Dev
 **Environment variables to add:**
 - `GROQ_API_KEY` (required)
 - `TAVILY_API_KEY` (required)
-- `REDIS_URL` (optional, your Upstash URL)
+- `REDIS_URL` (optional, your Redis connection URL)
 - `ENVIRONMENT=production`
 
 ### Frontend (Vercel)
