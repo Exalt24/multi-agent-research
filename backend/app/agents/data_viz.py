@@ -7,6 +7,7 @@ from .base import BaseAgent
 from .state import MarketResearchState
 from ..core.tokens import truncate_to_token_limit
 import json
+import re
 
 
 class DataVisualizationAgent(BaseAgent):
@@ -41,11 +42,20 @@ SUPPORTED CHART TYPES (frontend ChartRenderer supports these):
 - **pie**: Distribution, market share, percentages
 - **doughnut**: Similar to pie with center space
 
-Output as JSON array with Chart.js data format:
+CRITICAL: Output ONLY valid JSON. Follow these rules EXACTLY:
+- Use DOUBLE QUOTES for all strings (not single quotes)
+- NO trailing commas (last item in array/object has no comma)
+- NO comments in JSON
+- Numbers should be unquoted (85, not "85")
+- Close all brackets properly
+
+Output as JSON array with Chart.js data format (wrap in ```json code block):
+
+```json
 [
   {{
     "title": "Chart title",
-    "type": "bar|line|pie|doughnut",
+    "type": "bar",
     "description": "What it shows",
     "reason": "Why useful",
     "data": {{
@@ -57,7 +67,10 @@ Output as JSON array with Chart.js data format:
       }}]
     }}
   }}
-]"""),
+]
+```
+
+Remember: Valid JSON only, no trailing commas, double quotes, wrap in ```json block."""),
             ("human", """Companies: {companies}
 
 Comparative Analysis:
@@ -109,7 +122,20 @@ Recommend 3-5 visualizations for this research report.""")
             else:
                 json_str = recommendations
 
+            # Clean common JSON issues before parsing
+            # 1. Replace single quotes with double quotes (but not in contractions)
+            json_str = re.sub(r"(?<!\w)'([^']*?)'(?!\w)", r'"\1"', json_str)
+
+            # 2. Remove trailing commas before closing brackets
+            json_str = re.sub(r',\s*}', '}', json_str)
+            json_str = re.sub(r',\s*]', ']', json_str)
+
+            # 3. Remove comments (// or /* */)
+            json_str = re.sub(r'//.*?\n', '\n', json_str)
+            json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
+
             chart_specs = json.loads(json_str)
+            print(f"[OK] Successfully parsed {len(chart_specs)} chart specs from LLM")
         except (json.JSONDecodeError, ValueError, IndexError) as e:
             print(f"[!] Failed to parse chart specs from LLM: {e}")
             print(f"[!] LLM response was: {recommendations[:200]}...")
