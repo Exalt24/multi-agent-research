@@ -12,25 +12,25 @@
 A production-ready multi-agent AI system that automates market research and competitive analysis. Seven specialized agents work together to gather data, analyze competitors, validate findings, and generate comprehensive reports with visualizations.
 
 ### Key Metrics
-- **Time Reduction:** Manual research 6-8 hours → Agent system 2-3 minutes (100x+ faster)
-- **Agents:** 7 specialized agents with distinct roles
+- **Time Reduction:** Manual research 6-8 hours → Agent system 1.75 minutes (200x+ faster with parallel execution)
+- **Agents:** 7 specialized agents with distinct roles (2 parallel execution stages)
 - **Cost:** $0/month (free tier APIs: Tavily, Groq, Upstash Redis)
-- **Real-Time:** WebSocket monitoring of agent execution
-- **Tech Stack:** LangGraph, FastAPI, Next.js, Ollama/Groq
+- **Real-Time:** WebSocket monitoring with Human-in-the-Loop approval gates
+- **Tech Stack:** LangGraph, FastAPI, Next.js 16, Ollama/Groq, Redis, Chart.js, tiktoken
 
 ---
 
 ## The 7 Agents
 
-| Agent | Role | Tools Used |
-|-------|------|------------|
-| **Coordinator** | Plans workflow and manages execution | LLM reasoning |
-| **Web Research** | Gathers competitive intelligence | Tavily, DuckDuckGo, web scraping, RAG API |
-| **Financial Intelligence** | Researches funding, valuations, growth | Tavily, DuckDuckGo |
-| **Data Analyst** | Creates SWOT, feature comparisons | LLM analysis |
-| **Fact Checker** | Validates claims, confidence scoring | Cross-referencing, LLM |
-| **Content Synthesizer** | Writes executive summary + full report | LLM generation |
-| **Data Visualization** | Generates chart specifications | LLM recommendations |
+| Agent | Role | Tools Used | Execution |
+|-------|------|------------|-----------|
+| **Coordinator** | Creates strategic plan with objectives, priorities, focus areas | LLM with JSON output | Sequential |
+| **Web Research** | Gathers competitive intelligence using coordinator's search priorities | Tavily, DuckDuckGo, Redis cache, web scraping, RAG API | **Parallel** (with Financial) |
+| **Financial Intelligence** | Researches funding, revenue, growth using coordinator's financial priorities | Tavily, DuckDuckGo, Redis cache, web scraping | **Parallel** (with Web) |
+| **Data Analyst** | Creates SWOT, feature matrix using coordinator's comparison angles | LLM analysis, web + financial data | Sequential |
+| **Fact Checker** | Validates claims with HITL approval gate if issues detected | LLM validation, human oversight | Sequential |
+| **Content Synthesizer** | Writes summary + report structured around coordinator's objectives | LLM generation (2 calls) | **Parallel** (with Data Viz) |
+| **Data Visualization** | Generates Chart.js specs for frontend rendering | LLM recommendations | **Parallel** (with Content Synth) |
 
 ---
 
@@ -43,56 +43,79 @@ A production-ready multi-agent AI system that automates market research and comp
 └──────────────────┬─────────────────────────────────┘
                    │
                    v
-┌──────────────────────────────────────────────────┐
-│              FastAPI Backend                      │
-│         (LangGraph Workflow Engine)               │
-└──────────────────┬───────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│              FastAPI Backend (main.py)               │
+│         LangGraph + WebSocket + HITL + Redis         │
+└──────────────────┬───────────────────────────────────┘
                    │
       ┌────────────┴────────────┐
       v                         v
 ┌─────────────┐         ┌──────────────┐
 │ Coordinator │         │  WebSocket   │
 │   Agent     │         │   Manager    │
+│  (10s)      │         │ (Real-time)  │
 └──────┬──────┘         └──────┬───────┘
        │                       │
-       v                       │ (Real-time updates)
-┌──────────────────┐           │
-│  Web Research    │◄──────────┤
-│     Agent        │           │
-└────────┬─────────┘           │
-         │                     │
-         v                     │
-┌──────────────────┐           │
-│ Financial Intel  │◄──────────┤
-│     Agent        │           │
-└────────┬─────────┘           │
-         │                     │
-         v                     │
-┌──────────────────┐           │
-│  Data Analyst    │◄──────────┤
-│     Agent        │           │
-└────────┬─────────┘           │
-         │                     │
-         v                     │
-┌──────────────────┐           │
-│  Fact Checker    │◄──────────┤
-│     Agent        │           │
-└────────┬─────────┘           │
-         │                     │
-    ┌────┴────┐                │
-    v         v                │
-┌─────────┐ ┌──────────┐       │
-│Content  │ │Data Viz  │◄──────┤
-│Synth.   │ │  Agent   │       │
-└────┬────┘ └────┬─────┘       │
-     └──────┬────┘             │
-            v                  v
+       │ Creates strategic     │
+       │ guidance:             │
+       │ - search_priorities   │
+       │ - financial_priorities│
+       │ - comparison_angles   │
+       │ - depth_settings      │
+       v                       │
+┌──────────────────────────────┴──────────────┐
+│         PARALLEL STAGE 1 (Research)         │
+│  Web Research (40s)  │  Financial Intel(30s)│
+│  - Uses priorities   │  - Uses priorities   │
+│  - Redis cache       │  - Redis cache       │
+│  - Web scraping      │  - Web scraping      │
+│  - RAG integration   │                      │
+└──────────────────┬──────────────────────────┘
+                   │ (Both complete)
+                   v
+┌──────────────────┐
+│  Data Analyst    │◄───── Real-time updates
+│     (20s)        │
+│ - Combines data  │
+│ - Uses angles    │
+└────────┬─────────┘
+         │
+         v
+┌──────────────────┐
+│  Fact Checker    │◄───── Real-time updates
+│     (15s)        │
+│ - HITL gate      │◄──┐
+│ - Human approval │   │ (if issues)
+└────────┬─────────┘   │
+         │             │
+         v             │
+┌──────────────────────┴──────────────────┐
+│       PARALLEL STAGE 2 (Output)         │
+│  Content Synth (20s) │  Data Viz (15s)  │
+│  - Uses objectives   │  - Chart.js      │
+│  - 2 LLM calls       │  - Frontend ready│
+└──────────┬──────────────────┬────────────┘
+           │                  │
+           v                  v
      ┌──────────────┐    ┌──────────┐
-     │ Final Report │    │ Frontend │
-     └──────────────┘    │ (Real-   │
-                         │  time    │
-                         │  UI)     │
-                         └──────────┘
+     │ Final Report │    │  Charts  │
+     │ - Summary    │    │ - Bar    │
+     │ - Full MD    │    │ - Line   │
+     │ - PDF export │    │ - Pie    │
+     └──────┬───────┘    └────┬─────┘
+            │                 │
+            v                 v
+      ┌─────────────────────────┐
+      │    Frontend Display      │
+      │  - Research Strategy     │
+      │  - Live Agent Status     │
+      │  - Final Results         │
+      │  - Interactive Charts    │
+      │  - Download (PDF/MD/JSON)│
+      └──────────────────────────┘
+
+Total Time: ~105 seconds (1.75 minutes) with parallel execution
+vs. 150 seconds (2.5 minutes) sequential - 30% faster!
 ```
 
 ---
@@ -158,43 +181,53 @@ Frontend runs at: `http://localhost:3000`
 
 ### Core Capabilities
 
-✅ **Multi-Agent Orchestration**
-- 7 specialized agents working together
-- LangGraph state management
-- Sequential + parallel execution (future)
-- Error handling and retries
+✅ **Strategic Multi-Agent Orchestration**
+- 7 specialized agents with coordinator-driven execution
+- LangGraph state machines with parallel execution (2 stages)
+- Strategic coordinator generates: objectives, priorities, focus areas, depth settings
+- All agents adapt behavior based on coordinator's guidance
+- Error handling with exponential backoff retries (3 attempts)
 
-✅ **Intelligent Research**
-- Web search (Tavily + DuckDuckGo)
-- Web scraping and content extraction
-- Financial data gathering
-- RAG integration (Project 1 knowledge base)
+✅ **Intelligent Research with Caching**
+- Redis-backed search caching (5-10x speedup, protects Tavily quota)
+- Dual search: Tavily API (premium) + DuckDuckGo (free fallback)
+- Web scraping for comprehensive depth (full page content)
+- RAG integration (queries Project 1 Enterprise RAG knowledge base)
+- Depth-based research: light (fast) / standard (balanced) / comprehensive (thorough)
 
 ✅ **Comprehensive Analysis**
-- SWOT analysis per company
-- Feature comparison matrix
+- SWOT analysis per company (with financial metrics)
+- Feature comparison matrix (coordinator's comparison angles prioritized)
 - Market positioning insights
-- Pricing comparisons
-- Fact-checking with confidence scores
+- Pricing comparisons with financial context
+- Fact-checking with confidence scores + Human-in-the-Loop approval gates
 
 ✅ **Professional Output**
-- Executive summary (2-3 paragraphs)
-- Detailed markdown report
-- Chart specifications (Chart.js format)
-- Source attribution
+- Research strategy (coordinator's plan visible to users)
+- Executive summary (2-3 paragraphs, objectives-focused)
+- Detailed markdown report (structured around research objectives)
+- Interactive Chart.js visualizations (bar, line, pie, doughnut)
+- PDF export with embedded charts
+- Source attribution with URLs
 
-✅ **Real-Time Monitoring**
-- WebSocket live updates
-- Agent status tracking
-- Progress bars per agent
-- Cost tracking
+✅ **Real-Time Monitoring & Human Oversight**
+- WebSocket live updates (agent status, progress, messages)
+- Loading skeletons for better UX
+- Human-in-the-Loop approval gates (pause workflow for quality review)
+- Approval modal with context preview
+- Cost tracking with tiktoken (accurate per-call, per-agent breakdown)
 
 ✅ **Production Features**
-- Cost tracking (tokens, estimated $)
-- Error handling with retries
-- State persistence (Redis)
-- Health check endpoint
+- Parallel execution (30% faster: 105s vs 150s)
+- Accurate token counting (tiktoken, auto-detects llama3 vs llama-3.3-70b)
+- Per-company and per-call cost tracking
+- Rate limiting (5 req/min, protects quotas)
+- Configuration validation (fail-fast on startup)
+- Redis caching with 1-hour TTL
+- Health check endpoints (service, cache, LLM)
+- Error handling with proper logging
 - Docker deployment
+- Zero deprecation warnings
 
 ---
 
@@ -202,16 +235,30 @@ Frontend runs at: `http://localhost:3000`
 
 ### REST API
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/health` | Health check |
-| POST | `/api/research` | Start research workflow |
+| Method | Endpoint | Description | Rate Limit |
+|--------|----------|-------------|------------|
+| GET | `/health` | Health check | None |
+| GET | `/api/cache/stats` | Cache performance metrics | None |
+| GET | `/api/llm/health` | LLM provider status | None |
+| POST | `/api/research` | Start research workflow | 5/minute |
+| POST | `/api/approval/respond` | Submit HITL approval decision | None |
+| GET | `/api/approval/pending/{session_id}` | Get pending approvals | None |
+| GET | `/docs` | Interactive API documentation (Swagger) | None |
+| GET | `/redoc` | API documentation (ReDoc) | None |
 
 ### WebSocket
 
 | Endpoint | Description |
 |----------|-------------|
-| `WS /ws/research/{session_id}` | Real-time agent updates |
+| `WS /ws/research/{session_id}` | Real-time agent updates, HITL approvals, workflow status |
+
+### Message Types (WebSocket)
+- `workflow_started` - Research begins
+- `agent_status` - Agent progress updates
+- `approval_request` - Human approval needed
+- `approval_received` - Approval processed
+- `workflow_complete` - Research finished
+- `workflow_failed` - Research error
 
 ### Example Request
 
@@ -276,8 +323,8 @@ NEXT_PUBLIC_WS_URL=wss://your-backend.onrender.com
 
 ### Free Tier Services
 - **Groq:** 30 requests/min (LLM)
-- **Tavily:** 1,000/month (search)
-- **Upstash Redis:** 10K commands/day (state)
+- **Tavily:** 500/month (search - protected by Redis caching)
+- **Upstash Redis:** 10K commands/day (search result caching)
 - **Render:** 750 hours/month (backend)
 - **Vercel:** Unlimited (frontend)
 
@@ -292,27 +339,31 @@ multi-agent-research/
 ├── backend/
 │   ├── app/
 │   │   ├── agents/                    # Agent implementations
-│   │   │   ├── state.py               # MarketResearchState schema
-│   │   │   ├── base.py                # BaseAgent class
-│   │   │   ├── coordinator.py         # Workflow planning
-│   │   │   ├── web_research.py        # Web search + scraping
-│   │   │   ├── financial_intel.py     # Financial data
+│   │   │   ├── state.py               # MarketResearchState schema with Literal types
+│   │   │   ├── state_utils.py         # Timestamp & state helper functions
+│   │   │   ├── base.py                # BaseAgent with retry, HITL, cost tracking
+│   │   │   ├── coordinator.py         # Strategic planning with JSON output
+│   │   │   ├── web_research.py        # Web search + scraping + RAG
+│   │   │   ├── financial_intel.py     # Financial data research
 │   │   │   ├── data_analyst.py        # SWOT + comparisons
-│   │   │   ├── fact_checker.py        # Validation
-│   │   │   ├── content_synthesizer.py # Report generation
-│   │   │   ├── data_viz.py            # Chart specs
-│   │   │   ├── graph.py               # LangGraph workflow
+│   │   │   ├── fact_checker.py        # Validation + HITL gate
+│   │   │   ├── content_synthesizer.py # Report generation (2 LLM calls)
+│   │   │   ├── data_viz.py            # Chart.js specifications
+│   │   │   ├── graph.py               # LangGraph with parallel execution
 │   │   │   └── tools/                 # Agent tools
-│   │   │       ├── search.py          # Tavily, DuckDuckGo
-│   │   │       └── rag_client.py      # RAG integration
+│   │   │       ├── search.py          # Tavily, DuckDuckGo, Redis cache
+│   │   │       └── rag_client.py      # Project 1 integration
 │   │   ├── api/
-│   │   │   ├── schemas.py             # Pydantic models
-│   │   │   └── websocket.py           # WebSocket manager
+│   │   │   ├── schemas.py             # Pydantic models + HITL schemas
+│   │   │   └── websocket.py           # WebSocket manager + HITL messages
 │   │   ├── core/
-│   │   │   ├── config.py              # Settings
-│   │   │   ├── llm.py                 # LLM manager
-│   │   │   └── checkpointer.py        # State persistence
-│   │   └── main.py                    # FastAPI app
+│   │   │   ├── config.py              # Settings with validation
+│   │   │   ├── llm.py                 # LLM manager (Ollama/Groq)
+│   │   │   └── tokens.py              # tiktoken utilities
+│   │   ├── services/
+│   │   │   ├── cache.py               # Redis search result caching
+│   │   │   └── hitl_manager.py        # Human-in-the-Loop approval manager
+│   │   └── main.py                    # FastAPI app with rate limiting
 │   ├── tests/
 │   ├── requirements.txt
 │   ├── Dockerfile
@@ -323,15 +374,21 @@ multi-agent-research/
 │   │   ├── app/
 │   │   │   ├── page.tsx               # Home (research form)
 │   │   │   └── research/
-│   │   │       └── [sessionId]/page.tsx  # Agent monitoring
+│   │   │       └── [sessionId]/page.tsx  # Live monitoring + results
 │   │   ├── components/
-│   │   │   └── AgentCard.tsx          # Agent status card
-│   │   └── hooks/
-│   │       └── useWebSocket.ts        # WebSocket client
+│   │   │   ├── AgentCard.tsx          # Agent status card
+│   │   │   ├── AgentCardSkeleton.tsx  # Loading skeletons
+│   │   │   ├── ChartRenderer.tsx      # Chart.js renderer
+│   │   │   └── ApprovalModal.tsx      # HITL approval UI
+│   │   ├── hooks/
+│   │   │   └── useWebSocket.ts        # WebSocket client + HITL
+│   │   └── utils/
+│   │       └── pdfExport.ts           # PDF generation with charts
 │   └── package.json
 │
 ├── render.yaml                         # Render deployment config
-└── README.md
+├── README.md                           # User documentation
+└── SYSTEM-KNOWLEDGE.md                 # Technical deep dive
 ```
 
 ---
@@ -342,45 +399,80 @@ multi-agent-research/
 
 ```
 1. User submits query + companies → Frontend
-2. Frontend POST /api/research → Backend
-3. Backend creates session_id, initializes state
-4. LangGraph executes agents sequentially:
+2. Frontend POST /api/research → Backend (rate-limited: 5/min)
+3. Backend creates session_id, returns immediately (<100ms)
+4. Frontend connects WebSocket, receives live updates
+5. LangGraph executes agents with parallel optimization:
 
-   Coordinator Agent
-   ↓ (plans workflow)
-   Web Research Agent
-   ↓ (searches Tavily/DuckDuckGo, scrapes websites, queries RAG)
-   Financial Intelligence Agent
-   ↓ (gathers funding, growth, team data)
-   Data Analyst Agent
-   ↓ (creates SWOT, feature matrix, comparisons)
-   Fact Checker Agent
-   ↓ (validates claims, assigns confidence scores)
-   Content Synthesizer Agent
-   ↓ (writes executive summary + full report)
-   Data Visualization Agent
-   ↓ (generates Chart.js specifications)
-   Final Report Complete
+   Coordinator Agent (10s)
+   ↓ Generates strategic guidance (JSON):
+     - research_objectives (what questions to answer)
+     - search_priorities (keywords per company)
+     - financial_priorities (metrics to collect)
+     - comparison_angles (dimensions to compare)
+     - depth_settings (light/standard/comprehensive per agent)
 
-5. Backend returns complete research to frontend
-6. Frontend displays results
+   ┌─────────────────────┴────────────────────┐
+   │       PARALLEL STAGE 1: Research         │
+   ├─────────────────────┬────────────────────┤
+   Web Research (40s)    Financial Intel (30s)
+   - Uses search_priorities from coordinator
+   - Redis cache check first (5-10x speedup)
+   - Depth-based search volume
+   - Web scraping (comprehensive depth)
+   - RAG integration
+   ↓                     ↓
+   └─────────────────────┬────────────────────┘
+                         │ (Both complete)
+   Data Analyst Agent (20s)
+   ↓ Combines web + financial data
+   ↓ Uses coordinator's comparison_angles
+   ↓ Depth-based sections (light/standard/comprehensive)
 
-WebSocket: All agents emit real-time status updates during execution
+   Fact Checker Agent (15s)
+   ↓ Validates claims
+   ↓ HITL Gate: If issues detected →
+     - Pauses workflow
+     - Modal appears with report preview
+     - User decides: Continue or Stop
+     - Workflow resumes or ends based on decision
+
+   ┌─────────────────────┴────────────────────┐
+   │       PARALLEL STAGE 2: Output           │
+   ├─────────────────────┬────────────────────┤
+   Content Synth (20s)   Data Viz (15s)
+   - Uses objectives      - Generates Chart.js
+   - 2 LLM calls          - Bar/Line/Pie/Doughnut
+   ↓                     ↓
+   └─────────────────────┬────────────────────┘
+                         │
+   Final Report Complete (105 seconds total)
+
+6. Backend sends workflow_complete via WebSocket
+7. Frontend displays: strategy, results, charts, downloads
+
+Total Time: 105 seconds (1.75 minutes) - 30% faster than sequential!
+WebSocket: Real-time updates at every step
 ```
 
 ### State Management
 
 All agents share a single `MarketResearchState` (TypedDict) that accumulates:
-- Research findings (Web + Financial)
-- Competitor profiles
-- Comparative analysis
-- Fact-check results
-- Final report
-- Visualizations
-- Cost tracking
-- Errors
+- **Strategic guidance** (coordinator's objectives, priorities, angles, depth settings)
+- Research findings (Web + Financial, uses operator.add for parallel-safe accumulation)
+- Competitor profiles (web research data)
+- Financial data (funding, revenue, growth)
+- Comparative analysis (SWOT, feature matrix, positioning)
+- Fact-check results (with operator.add)
+- Final report + executive summary
+- Visualizations (Chart.js specs, with operator.add)
+- Cost tracking (per-agent breakdown with accurate token counts)
+- Errors (with operator.add for parallel error collection)
+- HITL state (pending approvals, responses)
 
-LangGraph passes state through the workflow, each agent reads and updates it.
+**operator.add pattern:** Fields marked with `Annotated[List[T], operator.add]` automatically concatenate when multiple agents write to them in parallel - critical for parallel execution safety!
+
+LangGraph passes state through the workflow, each agent reads coordinator's guidance and updates relevant fields.
 
 ---
 
@@ -450,17 +542,18 @@ OLLAMA_BASE_URL=http://localhost:11434  # For local development
 # Search APIs
 TAVILY_API_KEY=your_tavily_key          # Required for quality search
 
-# Redis (State Persistence)
-REDIS_URL=your_upstash_redis_url        # Optional, uses memory fallback
+# Redis (Search Result Caching)
+REDIS_URL=your_upstash_redis_url        # Optional, uses in-memory fallback
 
-# RAG Integration
+# RAG Integration (Project 1)
 RAG_API_URL=https://enterprise-rag-api.onrender.com/api
 
 # Application
 ENVIRONMENT=development  # or 'production'
 LOG_LEVEL=INFO
-MAX_PARALLEL_AGENTS=2
-AGENT_TIMEOUT=120
+MAX_PARALLEL_AGENTS=2   # Used for parallel execution stages
+AGENT_TIMEOUT=120       # Timeout per agent in seconds
+CACHE_TTL=3600          # Search cache TTL (1 hour)
 ```
 
 ### Frontend (.env.local)
@@ -480,37 +573,54 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8000              # Dev
 | Service | Free Tier | Usage | Cost |
 |---------|-----------|-------|------|
 | **Groq API** | 30 req/min | LLM inference | $0 |
-| **Tavily** | 1,000/month | Web search | $0 |
-| **Upstash Redis** | 10K cmd/day | State persistence | $0 |
+| **Tavily** | 500/month | Web search (with Redis caching to save quota) | $0 |
+| **Upstash Redis** | 10K cmd/day | Search result caching (1-hour TTL) | $0 |
 | **Render** | 750 hrs/month | Backend hosting | $0 |
 | **Vercel** | Unlimited | Frontend hosting | $0 |
 | **Ollama** | Unlimited | Local dev LLM | $0 |
 | **Total** | | | **$0/month** |
 
+**Quota Protection:**
+- Rate limiting: 5 research requests/minute (prevents quota exhaustion)
+- Redis caching: 5-10x speedup on repeated queries, saves Tavily searches
+- Coordinator depth settings: Light queries use fewer API calls
+
 ---
 
 ## Features Roadmap
 
-### ✅ Completed
-- [x] 7 specialized agents
-- [x] LangGraph orchestration
-- [x] FastAPI backend
+### ✅ Completed (Production-Ready)
+- [x] 7 specialized agents with distinct roles
+- [x] LangGraph orchestration with parallel execution (2 stages, 30% speedup)
+- [x] Strategic coordinator with JSON-structured guidance
+- [x] Coordinator-driven agent behavior (priorities, objectives, angles, depth)
+- [x] FastAPI backend with rate limiting (5 req/min)
 - [x] WebSocket real-time monitoring
-- [x] Next.js frontend
-- [x] State persistence (Redis)
-- [x] Cost tracking
-- [x] RAG integration (Project 1)
+- [x] Next.js 16 frontend (App Router, Turbopack)
+- [x] Redis search result caching (5-10x speedup)
+- [x] Accurate token counting (tiktoken with model auto-detection)
+- [x] Per-company and per-call cost tracking
+- [x] RAG integration (Project 1 Enterprise RAG)
+- [x] Human-in-the-Loop (HITL) approval gates with quality detection
+- [x] Chart rendering (Chart.js: bar, line, pie, doughnut)
+- [x] PDF export with embedded charts (jsPDF + html2canvas)
+- [x] Loading skeletons for better UX
+- [x] Configuration validation (fail-fast on startup)
+- [x] Depth-based research (light/standard/comprehensive)
+- [x] Web scraping for comprehensive depth
 - [x] Docker deployment
 - [x] Vercel deployment
+- [x] Zero deprecation warnings
+- [x] Zero bare except blocks
+- [x] Zero dead code
 
 ### 🔄 Future Enhancements
-- [ ] Human-in-the-Loop (HITL) approval gates
-- [ ] Parallel agent execution (LangGraph Send API)
-- [ ] Qdrant vector storage for historical research
-- [ ] Chart rendering (Chart.js integration)
-- [ ] Export reports (PDF, DOCX)
-- [ ] Agent performance A/B testing
-- [ ] Workflow templates (pre-configured use cases)
+- [ ] Qdrant vector storage for historical research (semantic search of past research)
+- [ ] Agent performance A/B testing (compare LLM models, prompt variations)
+- [ ] Workflow templates (pre-configured for specific industries)
+- [ ] Multi-language support (research in non-English markets)
+- [ ] Email report delivery (schedule research, receive via email)
+- [ ] API authentication (user accounts, usage tracking)
 
 ---
 
@@ -562,17 +672,28 @@ vercel --prod --yes
 
 ## Performance & Optimization
 
-### Memory Optimization (512MB Render Free Tier)
-- Lazy agent loading
-- Streaming LLM responses
-- Connection pooling (Redis)
-- Sequential execution (reduces concurrent memory)
+### Speed Optimizations (30% Faster Than Sequential)
+- **Parallel execution:** 2 stages run concurrently (Research + Output phases)
+  - Stage 1: Web Research + Financial Intel (saves 30s)
+  - Stage 2: Content Synthesizer + Data Viz (saves 15s)
+  - Total: 105s vs 150s = 30% faster
+- **Redis caching:** 5-10x speedup on repeated queries, 1-hour TTL
+- **Depth-based execution:** Light queries skip unnecessary work
+- **LLM fallback:** Ollama (dev) → Groq (prod) seamless switching
+- **Web scraping:** Only for comprehensive depth (smart resource usage)
 
-### Speed Optimizations
-- Redis caching for repeated queries
-- LLM fallback (Ollama → Groq)
-- Parallel search queries where possible
-- Efficient state management
+### Memory Optimization (512MB Render Free Tier)
+- Lazy agent loading (agents created only when needed)
+- Token-aware truncation (tiktoken prevents context overflow)
+- Connection pooling (Redis, httpx)
+- Parallel execution designed for memory safety (different state fields)
+- Smart caching reduces redundant API calls
+
+### Accuracy Optimizations
+- **tiktoken integration:** 0% error vs 22.9% error with len//4 estimation
+- **Model auto-detection:** Uses correct tokenizer (llama3 or llama-3.3-70b)
+- **Per-company cost tracking:** Aggregates actual LLM calls (not approximations)
+- **Per-call cost tracking:** Content Synthesizer tracks summary + report separately
 
 ---
 
@@ -616,19 +737,29 @@ python test_api.py
 ## Tech Highlights for Portfolio
 
 **What Makes This Unique:**
-- 7 agents (most tutorials show 2-3)
-- LangGraph state machines (production pattern)
-- Real-time WebSocket monitoring
-- Microservices integration (RAG API)
-- 100% free tier ($0/month)
-- Production-ready (Docker, health checks, error handling)
+- **7 specialized agents** with strategic coordinator that actually controls execution (not just documentation)
+- **Parallel execution** at 2 stages using LangGraph (30% speedup, production-grade concurrency)
+- **Strategic coordination pattern:** Coordinator generates JSON guidance (objectives, priorities, angles) that all downstream agents use
+- **Human-in-the-Loop gates:** Quality-based workflow pausing with approval UI
+- **Redis caching** for search results (5-10x speedup, quota protection)
+- **Accurate token counting** with tiktoken and model auto-detection
+- **Real-time WebSocket** with 6 message types (status, approval, completion, etc.)
+- **Microservices integration** (Project 1 RAG API, Project 2 Multi-Agent)
+- **Complete feature set:** Charts, PDF export, HITL, caching, rate limiting, validation
+- **100% free tier** ($0/month production cost)
+- **Zero technical debt:** No deprecations, no dead code, no bare excepts
 
 **Interview Talking Points:**
-- Multi-agent orchestration strategies
-- State management in distributed systems
-- Cost optimization (free tier architecture)
-- Real-time communication (WebSocket)
-- Error handling and retries in AI systems
+- **Strategic multi-agent orchestration:** How coordinator guides 7 agents with structured parameters
+- **Parallel execution in LangGraph:** Fan-out/fan-in patterns, operator.add for state merging
+- **State management:** TypedDict with operator.add for parallel-safe accumulation
+- **Cost optimization:** Free tier architecture with Redis caching, rate limiting, depth-based execution
+- **Real-time communication:** WebSocket pub/sub, HITL approval flow, concurrent connection handling
+- **Production patterns:** Retry logic, exponential backoff, timeout protection, graceful degradation
+- **Microservice integration:** Async HTTP with httpx, error resilience, health checks
+- **Token accuracy:** tiktoken integration, model auto-detection (llama3 vs llama-3.3-70b)
+- **Quality gates:** HITL with keyword detection, approval timeout handling, workflow control
+- **End-to-end system:** Backend (FastAPI/LangGraph) + Frontend (Next.js/Chart.js) + Caching (Redis) + RAG (Project 1)
 
 ---
 

@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 
 interface ResearchResults {
+  research_plan?: string;
   competitor_profiles: Record<string, { analysis: string; sources: string[] }>;
   comparative_analysis: { analysis_text: string };
   executive_summary: string;
@@ -22,6 +23,14 @@ interface AgentStatus {
   timestamp: number;
 }
 
+interface ApprovalRequest {
+  approval_id: string;
+  agent: string;
+  question: string;
+  context: Record<string, any>;
+  options: string[];
+}
+
 interface WebSocketMessage {
   type: string;
   session_id?: string;
@@ -32,6 +41,11 @@ interface WebSocketMessage {
   data?: ResearchResults | Record<string, unknown>;
   timestamp?: number;
   error?: string;
+  // HITL fields
+  approval_id?: string;
+  question?: string;
+  context?: Record<string, any>;
+  options?: string[];
 }
 
 export function useWebSocket(sessionId: string) {
@@ -44,6 +58,8 @@ export function useWebSocket(sessionId: string) {
     null
   );
   const [workflowComplete, setWorkflowComplete] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState<ApprovalRequest | null>(null);
+  const [researchPlan, setResearchPlan] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const workflowCompleteRef = useRef(false);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -86,12 +102,39 @@ export function useWebSocket(sessionId: string) {
                 timestamp: message.timestamp || Date.now(),
               },
             }));
+
+            // If Coordinator completed, extract research plan from data
+            if (agentName === "Coordinator Agent" && message.status === "completed" && message.data) {
+              const data = message.data as Record<string, any>;
+              if (data.research_plan) {
+                setResearchPlan(data.research_plan as string);
+              }
+            }
+          } else if (message.type === "approval_request") {
+            // Human-in-the-Loop approval request
+            setPendingApproval({
+              approval_id: message.approval_id || "",
+              agent: message.agent || "",
+              question: message.question || "",
+              context: (message.context as Record<string, any>) || {},
+              options: message.options || ["Approve", "Reject"],
+            });
+          } else if (message.type === "approval_received") {
+            // Approval was processed, clear pending
+            setPendingApproval(null);
           } else if (message.type === "workflow_complete") {
             setWorkflowComplete(true);
             workflowCompleteRef.current = true;
-            setFinalResults((message.data as ResearchResults) || null);
+            const results = (message.data as ResearchResults) || null;
+            setFinalResults(results);
+            // Extract research plan from final results
+            if (results?.research_plan) {
+              setResearchPlan(results.research_plan);
+            }
+            setPendingApproval(null); // Clear any pending approvals
           } else if (message.type === "workflow_failed") {
             setError(message.error || "Workflow failed");
+            setPendingApproval(null); // Clear any pending approvals
           }
         } catch (err) {
           console.error("Failed to parse WebSocket message:", err);
@@ -151,5 +194,9 @@ export function useWebSocket(sessionId: string) {
     error,
     finalResults,
     workflowComplete,
+    pendingApproval,
+    researchPlan,
   };
 }
+
+export type { ApprovalRequest };

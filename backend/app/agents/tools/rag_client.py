@@ -75,5 +75,6 @@ class RAGClient:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.get(f"{self.base_url}/health")
                 return response.status_code == 200
-        except:
+        except Exception as e:
+            print(f"[!] RAG health check failed: {e}")
             return False

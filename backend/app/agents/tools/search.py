@@ -1,13 +1,12 @@
 """Search tools: Tavily, DuckDuckGo, and web scraping."""
 
-import os
 from typing import List, Dict, Any, Optional
-from langchain_core.tools import tool
 from tavily import TavilyClient
 from ddgs import DDGS
 import requests
 from bs4 import BeautifulSoup
 from ..state import MarketResearchState
+from app.services.cache import search_cache
 
 
 # Tavily Search Tool
@@ -170,26 +169,59 @@ class SearchManager:
         self,
         query: str,
         max_results: int = 5,
-        use_tavily: bool = True
+        use_tavily: bool = True,
+        include_domains: Optional[List[str]] = None,
+        exclude_domains: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
-        """Search with Tavily first, fallback to DuckDuckGo.
+        """Search with Tavily first, fallback to DuckDuckGo. Uses Redis cache.
 
         Args:
             query: Search query
             max_results: Maximum results
             use_tavily: Try Tavily first if available
+            include_domains: Domains to include
+            exclude_domains: Domains to exclude
 
         Returns:
-            Search results
+            Search results (from cache or API)
         """
+        # Check cache first (5-10x faster, saves Tavily quota)
+        cached_results = search_cache.get(
+            query,
+            max_results,
+            include_domains,
+            exclude_domains
+        )
+        if cached_results:
+            return cached_results
+
+        # Cache miss - fetch from API
+        results = []
+
         # Try Tavily first (better quality)
         if use_tavily and self.tavily:
-            results = await self.tavily.search(query, max_results)
-            if results:
-                return results
+            results = await self.tavily.search(
+                query,
+                max_results,
+                include_domains,
+                exclude_domains
+            )
 
-        # Fallback to DuckDuckGo (free, unlimited)
-        return await self.ddg.search(query, max_results)
+        # Fallback to DuckDuckGo if Tavily fails (free, unlimited)
+        if not results:
+            results = await self.ddg.search(query, max_results)
+
+        # Cache the results for future requests
+        if results:
+            search_cache.set(
+                query,
+                results,
+                max_results,
+                include_domains,
+                exclude_domains
+            )
+
+        return results
 
     async def scrape_url(self, url: str) -> Dict[str, Any]:
         """Scrape content from URL."""

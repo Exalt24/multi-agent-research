@@ -1,6 +1,5 @@
 """Web Research Agent - Gathers competitive intelligence from the web."""
 
-import os
 from typing import Dict, Any, List
 from langchain_core.language_models import BaseLLM
 from langchain_core.prompts import ChatPromptTemplate
@@ -128,16 +127,36 @@ Follow this structure exactly with proper markdown formatting.""")
                 f"Researching {company}..."
             )
 
-            # Research this company
-            company_data = await self._research_company(company, query)
+            # Research this company with strategic guidance from coordinator
+            company_data = await self._research_company(company, query, state)
             findings.append(company_data)
             profiles[company] = company_data
 
         await self._emit_status("running", 95, "Finalizing research...")
 
-        # Track cost
-        total_text = " ".join([str(f) for f in findings])
-        cost_info = self._track_cost(query, total_text)
+        # Aggregate per-company costs for accurate total tracking
+        total_input_tokens = 0
+        total_output_tokens = 0
+        total_cost = 0.0
+
+        for finding in findings:
+            if "cost_info" in finding:
+                company_cost = finding["cost_info"]
+                total_input_tokens += company_cost.get("input_tokens", 0)
+                total_output_tokens += company_cost.get("output_tokens", 0)
+                total_cost += company_cost.get("estimated_cost_usd", 0.0)
+
+        # Aggregate cost info
+        cost_info = {
+            "agent": self.name,
+            "input_tokens": total_input_tokens,
+            "output_tokens": total_output_tokens,
+            "total_tokens": total_input_tokens + total_output_tokens,
+            "estimated_cost_usd": total_cost,
+            "model_name": self._get_model_name(),
+            "timestamp": findings[0]["cost_info"]["timestamp"] if findings and "cost_info" in findings[0] else 0,
+            "companies_researched": len(companies)
+        }
 
         return {
             "research_findings": findings,
@@ -150,50 +169,103 @@ Follow this structure exactly with proper markdown formatting.""")
             }
         }
 
-    async def _research_company(self, company: str, query: str) -> Dict[str, Any]:
-        """Research a single company.
+    async def _research_company(self, company: str, query: str, state: MarketResearchState) -> Dict[str, Any]:
+        """Research a single company using coordinator's strategic guidance.
 
         Args:
             company: Company name
             query: User's original query
+            state: Full state with coordinator's search priorities
 
         Returns:
             Dictionary with research findings
         """
-        # Build search queries
-        search_queries = [
-            f"{company} product features pricing",
-            f"{company} vs competitors review",
-            f"{company} recent news updates"
-        ]
+        # Get search priorities from coordinator (or use defaults)
+        search_priorities = state.get("search_priorities", {})
+        company_keywords = search_priorities.get(company, [])
+
+        # Build search queries based on coordinator's guidance
+        if company_keywords:
+            # Use coordinator's strategic keywords
+            search_queries = [f"{company} {keyword}" for keyword in company_keywords[:3]]
+            print(f"[i] Using coordinator's search priorities for {company}: {company_keywords[:3]}")
+        else:
+            # Fallback to default queries if coordinator didn't specify
+            search_queries = [
+                f"{company} product features pricing",
+                f"{company} vs competitors review",
+                f"{company} recent news updates"
+            ]
+            print(f"[i] Using default search queries for {company} (no coordinator priorities)")
+
+        # Get depth setting from coordinator
+        depth_settings = state.get("depth_settings", {})
+        web_depth = depth_settings.get("web_research", "standard")
+
+        # Adjust number of searches based on depth
+        max_queries = {"light": 2, "standard": 3, "comprehensive": 4}.get(web_depth, 3)
 
         all_results = []
 
-        # Execute searches
-        for search_query in search_queries[:2]:  # Limit to 2 queries per company
+        # Execute searches (number based on coordinator's depth setting)
+        for search_query in search_queries[:max_queries]:
+            # Adjust results per query based on depth
+            results_per_query = {"light": 2, "standard": 3, "comprehensive": 5}.get(web_depth, 3)
+
             results = await self.search_manager.search(
                 query=search_query,
-                max_results=3
+                max_results=results_per_query
             )
             all_results.extend(results)
+
+        # For comprehensive depth, scrape top URLs for full content (not just snippets)
+        if web_depth == "comprehensive" and all_results:
+            await self._emit_status("running", int(progress) + 5, f"Scraping full content for {company}...")
+
+            # Scrape top 2 URLs for complete context
+            urls_to_scrape = [r["url"] for r in all_results[:2]]
+            print(f"[i] Comprehensive depth: Scraping {len(urls_to_scrape)} URLs for full content")
+
+            for url in urls_to_scrape:
+                scraped = await self.search_manager.scrape_url(url)
+                if scraped.get("success"):
+                    # Add scraped content as additional "result"
+                    all_results.append({
+                        "title": f"Full Content: {scraped['title']}",
+                        "url": url,
+                        "content": scraped["content"],
+                        "score": 1.0,  # High priority (full content)
+                        "source": "scraped"
+                    })
+                    print(f"[i] Scraped {len(scraped['content'])} chars from {url}")
+                else:
+                    print(f"[!] Failed to scrape {url}: {scraped.get('error', 'Unknown error')}")
 
         # Check RAG for existing research (if available)
         rag_info = ""
         if self.rag_client:
             try:
+                # Adjust RAG chunks based on depth setting
+                rag_chunks = {"light": 1, "standard": 2, "comprehensive": 4}.get(web_depth, 2)
+
                 rag_response = await self.rag_client.query(
                     question=f"What do you know about {company}?",
-                    max_chunks=2
+                    max_chunks=rag_chunks
                 )
                 if rag_response.get("success"):
-                    rag_info = f"\n\nExisting Knowledge: {rag_response.get('answer', '')}"
-            except:
-                pass  # RAG is optional
+                    rag_info = f"\n\nExisting Knowledge from RAG: {rag_response.get('answer', '')}"
+            except Exception as e:
+                # RAG is optional, but log errors for debugging
+                print(f"[!] RAG query failed for {company}: {e}")
+                # Continue without RAG data (graceful degradation)
 
-        # Format search results for LLM
+        # Format search results for LLM (adapt to depth setting)
+        # Light: 5 results, Standard: 10 results, Comprehensive: 15 results
+        max_results_to_use = {"light": 5, "standard": 10, "comprehensive": 15}.get(web_depth, 10)
+
         formatted_results = "\n\n".join([
             f"[{r['source'].upper()}] {r['title']}\n{r['content']}\nURL: {r['url']}"
-            for r in all_results[:10]  # Limit to 10 results
+            for r in all_results[:max_results_to_use]
         ])
 
         # Analyze with LLM
@@ -206,10 +278,15 @@ Follow this structure exactly with proper markdown formatting.""")
         response = await self.llm.ainvoke(messages)
         analysis = response.content if hasattr(response, 'content') else str(response)
 
+        # Track cost for this specific company
+        input_text = f"{company}\n{query}\n{formatted_results}\n{rag_info}"
+        company_cost = self._track_cost(input_text, analysis)
+
         return {
             "company": company,
             "analysis": analysis,
             "search_results": all_results,
             "sources": [r["url"] for r in all_results],
-            "agent": self.name
+            "agent": self.name,
+            "cost_info": company_cost  # Include cost tracking for this company
         }
