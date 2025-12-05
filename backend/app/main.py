@@ -1,15 +1,24 @@
 """FastAPI application for multi-agent market research."""
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from .core.config import get_settings
-from .api.schemas import ResearchRequest, ResearchResponse, HealthResponse
+from .api.schemas import ResearchRequest, ResearchResponse, HealthResponse, ApprovalResponse
 from .api.websocket import get_ws_manager
 from .agents.graph import run_research
+from .services.cache import search_cache
+from .services.hitl_manager import hitl_manager
+from .core.llm import llm_health_check
 import uvicorn
 
 settings = get_settings()
+
+# Rate limiter (protects free tier quotas)
+limiter = Limiter(key_func=get_remote_address)
 
 
 @asynccontextmanager
@@ -18,7 +27,20 @@ async def lifespan(app: FastAPI):
     # Startup
     print(">>> Multi-Agent Research Platform starting...")
     print(f"Environment: {settings.environment}")
+
+    # Validate configuration
+    try:
+        settings.validate_requirements()
+        print("[OK] Configuration validated successfully")
+    except ValueError as e:
+        print(f"[ERROR] Configuration validation failed:\n{e}")
+        raise
+
     print(f"LLM: {'Ollama (local)' if settings.use_ollama else 'Groq (cloud)'}")
+
+    # Show cache status
+    cache_stats = search_cache.get_stats()
+    print(f"Cache: {cache_stats['cache_type']} ({'Redis connected' if cache_stats['redis_connected'] else 'In-memory fallback'})")
 
     yield
 
@@ -33,6 +55,10 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan
 )
+
+# Add rate limiter state and exception handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Add CORS middleware
 app.add_middleware(
@@ -53,6 +79,74 @@ async def health_check():
     )
 
 
+@app.get("/api/cache/stats")
+async def get_cache_stats():
+    """Get search cache statistics.
+
+    Returns cache hit rate, entries, and connection status.
+    Useful for monitoring cache performance and Tavily quota savings.
+    """
+    return search_cache.get_stats()
+
+
+@app.get("/api/llm/health")
+async def get_llm_health():
+    """Check LLM provider availability and configuration.
+
+    Returns which LLM providers are configured and available.
+    Useful for debugging LLM connection issues.
+    """
+    return llm_health_check()
+
+
+@app.post("/api/approval/respond")
+async def submit_approval(approval: ApprovalResponse):
+    """Submit user response to an approval request.
+
+    Args:
+        approval: User's approval decision
+
+    Returns:
+        Success status
+    """
+    success = hitl_manager.submit_approval_response(
+        session_id=approval.session_id,
+        approval_id=approval.approval_id,
+        decision=approval.decision,
+        feedback=approval.feedback
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Approval request {approval.approval_id} not found"
+        )
+
+    # Notify via WebSocket that approval was received
+    ws_manager = get_ws_manager()
+    await ws_manager.send_update(approval.session_id, {
+        "type": "approval_received",
+        "approval_id": approval.approval_id,
+        "decision": approval.decision
+    })
+
+    return {"status": "success", "message": "Approval received"}
+
+
+@app.get("/api/approval/pending/{session_id}")
+async def get_pending_approvals(session_id: str):
+    """Get all pending approval requests for a session.
+
+    Args:
+        session_id: Research session ID
+
+    Returns:
+        List of pending approvals
+    """
+    approvals = hitl_manager.get_pending_approvals(session_id)
+    return {"session_id": session_id, "pending_approvals": approvals}
+
+
 @app.websocket("/ws/research/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     """WebSocket endpoint for real-time research updates.
@@ -65,24 +159,30 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     await ws_manager.connect(websocket, session_id)
 
     try:
-        # Keep connection alive and receive messages
+        # Keep connection alive and listen for disconnect
         while True:
             data = await websocket.receive_text()
-            # Echo back (can implement client commands here if needed)
-            await websocket.send_text(f"Received: {data}")
+            # Client messages are currently not used (updates are server-initiated)
+            # Future: Could implement commands like "pause", "cancel", "resume"
     except WebSocketDisconnect:
         await ws_manager.disconnect(websocket, session_id)
 
 
 @app.post("/api/research", response_model=ResearchResponse)
-async def start_research(request: ResearchRequest):
+@limiter.limit("5/minute")  # Limit to 5 research requests per minute (protects Tavily quota)
+async def start_research(request: ResearchRequest, req: Request):
     """Start a research workflow.
 
     Args:
         request: Research request with query and companies
+        req: FastAPI Request object (required for rate limiting)
 
     Returns:
         Session ID to connect to WebSocket for real-time updates
+
+    Rate Limit:
+        5 requests per minute per IP address.
+        Protects Tavily API quota (500 searches/month free tier).
     """
     import asyncio
     import uuid
@@ -122,6 +222,7 @@ async def start_research(request: ResearchRequest):
                     "session_id": session_id,
                     "status": "completed",
                     "data": {
+                        "research_plan": final_state.get("research_plan", ""),
                         "competitor_profiles": final_state.get("competitor_profiles", {}),
                         "comparative_analysis": final_state.get("comparative_analysis", {}),
                         "executive_summary": final_state.get("executive_summary", ""),
