@@ -6,6 +6,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from .base import BaseAgent
 from .state import MarketResearchState
 from .tools.search import SearchManager
+from ..core.tokens import truncate_to_token_limit
 
 
 class FactCheckerAgent(BaseAgent):
@@ -84,9 +85,17 @@ Follow this structure exactly with proper markdown formatting.""")
 
         await self._emit_status("running", 10, "Fact-checking analysis...")
 
+        # Truncate analysis to fit context window (use actual model for accurate truncation)
+        analysis_truncated = truncate_to_token_limit(
+            analysis,
+            max_tokens=5000,
+            model_name=self._get_model_name(),
+            suffix="... (analysis truncated for length)"
+        )
+
         # Fact-check with LLM
         messages = self.fact_check_prompt.format_messages(
-            analysis=analysis[:3000]  # Limit for token management
+            analysis=analysis_truncated
         )
 
         response = await self.llm.ainvoke(messages)
@@ -103,6 +112,63 @@ Follow this structure exactly with proper markdown formatting.""")
             "timestamp": cost_info["timestamp"],
             "agent": self.name
         }
+
+        # HITL Gate: Check if approval needed for low-confidence results
+        # If fact-check report contains warnings or failed claims, ask user
+        report_lower = fact_check_report.lower()
+        needs_approval = (
+            "unverified" in report_lower or
+            "could not verify" in report_lower or
+            "insufficient evidence" in report_lower or
+            "contradictory" in report_lower
+        )
+
+        if needs_approval:
+            await self._emit_status("running", 85, "Quality concerns detected, requesting human review...")
+
+            try:
+                # Request human approval
+                approval_response = await self._request_approval(
+                    approval_id=f"fact-check-{state.get('session_id', 'unknown')[:8]}",
+                    question="Fact-check found potential issues. Review the report and decide whether to continue.",
+                    context={
+                        "report_preview": fact_check_report[:500] + "...",
+                        "concerns": "Unverified claims or insufficient evidence detected"
+                    },
+                    options=["Continue Anyway", "Stop Workflow"],
+                    timeout=300  # 5 minutes
+                )
+
+                # Check user decision
+                if approval_response["decision"] == "reject" or "Stop" in approval_response.get("decision", ""):
+                    # User chose to stop - add error to halt workflow
+                    return {
+                        "fact_check_results": [fact_check_result],
+                        "validated_claims": [],
+                        "current_agent": self.name,
+                        "current_phase": "validation",
+                        "workflow_status": "failed",
+                        "errors": [{
+                            "agent": self.name,
+                            "error": "Workflow stopped by user after fact-check review",
+                            "timestamp": cost_info["timestamp"]
+                        }],
+                        "cost_tracking": {
+                            **state.get("cost_tracking", {}),
+                            self.name: cost_info
+                        }
+                    }
+
+                # User approved - continue with workflow
+                await self._emit_status("running", 90, "Human approval received, continuing...")
+
+            except TimeoutError:
+                # Timeout - default to continuing (don't block workflow forever)
+                await self._emit_status("running", 90, "Approval timeout - continuing with workflow...")
+            except Exception as e:
+                # HITL error - log but continue (don't break workflow on HITL failures)
+                print(f"[!] HITL approval failed: {e}")
+                await self._emit_status("running", 90, "Approval failed - continuing with workflow...")
 
         return {
             "fact_check_results": [fact_check_result],

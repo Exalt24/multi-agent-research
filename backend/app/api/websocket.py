@@ -106,6 +106,36 @@ class WebSocketManager:
             "timestamp": asyncio.get_event_loop().time()
         })
 
+    async def send_approval_request(
+        self,
+        session_id: str,
+        approval_id: str,
+        agent: str,
+        question: str,
+        context: dict = None,
+        options: list = None
+    ):
+        """Send approval request to frontend via WebSocket.
+
+        Args:
+            session_id: Research session ID
+            approval_id: Unique approval ID
+            agent: Agent requesting approval
+            question: Question to ask user
+            context: Additional context
+            options: Available options
+        """
+        await self.send_update(session_id, {
+            "type": "approval_request",
+            "session_id": session_id,
+            "approval_id": approval_id,
+            "agent": agent,
+            "question": question,
+            "context": context or {},
+            "options": options or ["Approve", "Reject"],
+            "timestamp": asyncio.get_event_loop().time()
+        })
+
 
 # Global WebSocket manager instance
 ws_manager = WebSocketManager()

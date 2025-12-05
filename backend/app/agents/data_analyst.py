@@ -124,14 +124,26 @@ Follow this structure exactly with proper markdown formatting.""")
         """
         companies = state.get("companies", [])
         profiles = state.get("competitor_profiles", {})
+        financial_data = state.get("financial_data", {})
 
         await self._emit_status("running", 10, f"Analyzing {len(companies)} companies...")
 
-        # Combine all research data
-        research_data = "\n\n".join([
-            f"### {company}\n{profile.get('analysis', 'No data')}"
-            for company, profile in profiles.items()
-        ])
+        # Combine all research data (web research + financial intel)
+        research_data_parts = []
+        for company in companies:
+            company_section = f"### {company}\n\n"
+
+            # Add web research data
+            if company in profiles:
+                company_section += f"**Web Research:**\n{profiles[company].get('analysis', 'No data')}\n\n"
+
+            # Add financial data
+            if company in financial_data:
+                company_section += f"**Financial Intelligence:**\n{financial_data[company].get('analysis', 'No financial data')}\n\n"
+
+            research_data_parts.append(company_section)
+
+        research_data = "\n\n".join(research_data_parts)
 
         # Create helper strings for prompt
         company_list = " | ".join(companies)
@@ -139,13 +151,37 @@ Follow this structure exactly with proper markdown formatting.""")
 
         await self._emit_status("running", 50, "Creating comparative analysis...")
 
+        # Get comparison angles from coordinator for focused analysis
+        comparison_angles = state.get("comparison_angles", [])
+        if comparison_angles:
+            angles_guidance = f"\n\nPRIORITY COMPARISON DIMENSIONS (from coordinator):\n" + "\n".join(f"- {angle}" for angle in comparison_angles)
+            research_data_enhanced = research_data + angles_guidance
+            print(f"[i] Using coordinator's comparison angles: {comparison_angles}")
+        else:
+            research_data_enhanced = research_data
+            print(f"[i] Using default analysis (no coordinator angles)")
+
+        # Get depth setting from coordinator to adjust analysis scope
+        depth_settings = state.get("depth_settings", {})
+        analysis_depth = state.get("analysis_depth", "standard")
+
+        # Add depth instructions to guide LLM
+        if analysis_depth == "light":
+            depth_instruction = "\n\nANALYSIS DEPTH: Light - Focus on Feature Comparison Matrix only. Skip SWOT and detailed positioning."
+        elif analysis_depth == "comprehensive":
+            depth_instruction = "\n\nANALYSIS DEPTH: Comprehensive - Include detailed SWOT, market positioning, competitive dynamics, and strategic recommendations."
+        else:
+            depth_instruction = "\n\nANALYSIS DEPTH: Standard - Include Feature Matrix, SWOT, and Market Positioning."
+
+        research_data_enhanced += depth_instruction
+        print(f"[i] Analysis depth: {analysis_depth}")
+
         # Generate analysis with LLM
         messages = self.analysis_prompt.format_messages(
             companies=", ".join(companies),
-            research_data=research_data,
+            research_data=research_data_enhanced,
             company_list=company_list,
-            separator=separator,
-            company_1=companies[0] if companies else ""
+            separator=separator
         )
 
         response = await self.llm.ainvoke(messages)

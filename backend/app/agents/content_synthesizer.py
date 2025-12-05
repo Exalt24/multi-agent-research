@@ -5,6 +5,7 @@ from langchain_core.language_models import BaseLLM
 from langchain_core.prompts import ChatPromptTemplate
 from .base import BaseAgent
 from .state import MarketResearchState
+from ..core.tokens import truncate_to_token_limit
 
 
 class ContentSynthesizerAgent(BaseAgent):
@@ -115,6 +116,15 @@ Create a comprehensive research report following the EXACT structure above.""")
         analysis = state.get("comparative_analysis", {}).get("analysis_text", "")
         profiles = state.get("competitor_profiles", {})
 
+        # Get research objectives from coordinator for report structure
+        research_objectives = state.get("research_objectives", [])
+        if research_objectives:
+            objectives_text = "\n\nKEY RESEARCH OBJECTIVES TO ADDRESS:\n" + "\n".join(f"{i+1}. {obj}" for i, obj in enumerate(research_objectives))
+            print(f"[i] Structuring report around {len(research_objectives)} objectives from coordinator")
+        else:
+            objectives_text = ""
+            print(f"[i] No research objectives from coordinator, using default structure")
+
         await self._emit_status("running", 10, "Synthesizing research...")
 
         # Combine research findings
@@ -126,31 +136,80 @@ Create a comprehensive research report following the EXACT structure above.""")
         # Generate executive summary
         await self._emit_status("running", 30, "Writing executive summary...")
 
+        # Truncate analysis to fit in context window (leave room for prompt + response)
+        # Reserve ~2000 tokens for prompt template + 1000 for response = 3000 total
+        # Context window: 8192 tokens, so 5000 for analysis is safe
+        analysis_with_objectives = analysis + objectives_text
+        analysis_truncated = truncate_to_token_limit(
+            analysis_with_objectives,
+            max_tokens=5000,
+            model_name=self._get_model_name(),
+            suffix="... (truncated for length)"
+        )
+
         summary_messages = self.summary_prompt.format_messages(
             query=query,
-            analysis=analysis[:2000]  # Limit for summary
+            analysis=analysis_truncated
         )
         summary_response = await self.llm.ainvoke(summary_messages)
         executive_summary = summary_response.content if hasattr(summary_response, 'content') else str(summary_response)
 
+        # Track cost for executive summary generation
+        summary_cost = self._track_cost(analysis_truncated, executive_summary)
+
         # Generate full report
         await self._emit_status("running", 60, "Writing detailed report...")
+
+        # Truncate research text to fit context (research can be very long with multiple companies)
+        # Include objectives to guide report structure
+        research_with_objectives = research_text + objectives_text
+        research_truncated = truncate_to_token_limit(
+            research_with_objectives,
+            max_tokens=4000,
+            model_name=self._get_model_name(),
+            suffix="... (additional research truncated for length)"
+        )
+
+        # Truncate analysis for report too (prevent context overflow)
+        analysis_for_report = truncate_to_token_limit(
+            analysis,
+            max_tokens=3000,
+            model_name=self._get_model_name(),
+            suffix="... (analysis truncated)"
+        )
 
         report_messages = self.report_prompt.format_messages(
             query=query,
             companies=", ".join(companies),
-            research=research_text[:3000],  # Limit to manage tokens
-            analysis=analysis
+            research=research_truncated,
+            analysis=analysis_for_report
         )
         report_response = await self.llm.ainvoke(report_messages)
         final_report = report_response.content if hasattr(report_response, 'content') else str(report_response)
 
+        # Track cost for full report generation
+        report_input = research_truncated + analysis_for_report
+        report_cost = self._track_cost(report_input, final_report)
+
         await self._emit_status("running", 90, "Finalizing report...")
 
-        # Track cost
-        combined_input = research_text + analysis
-        combined_output = executive_summary + final_report
-        cost_info = self._track_cost(combined_input, combined_output)
+        # Aggregate costs from both LLM calls (summary + report)
+        total_input_tokens = summary_cost.get("input_tokens", 0) + report_cost.get("input_tokens", 0)
+        total_output_tokens = summary_cost.get("output_tokens", 0) + report_cost.get("output_tokens", 0)
+        total_cost = summary_cost.get("estimated_cost_usd", 0.0) + report_cost.get("estimated_cost_usd", 0.0)
+
+        cost_info = {
+            "agent": self.name,
+            "input_tokens": total_input_tokens,
+            "output_tokens": total_output_tokens,
+            "total_tokens": total_input_tokens + total_output_tokens,
+            "estimated_cost_usd": total_cost,
+            "model_name": self._get_model_name(),
+            "timestamp": summary_cost.get("timestamp", 0),
+            "llm_calls": 2,  # Summary + Report
+            "summary_tokens": summary_cost.get("total_tokens", 0),
+            "report_tokens": report_cost.get("total_tokens", 0)
+        }
 
         return {
             "executive_summary": executive_summary,
