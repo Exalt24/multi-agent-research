@@ -180,7 +180,7 @@ async def run_research(
     initial_state: MarketResearchState = {
         "messages": [],
         "current_phase": "planning",
-        "current_agent": "",
+        "current_agent": [],  # List of active agents (accumulates with operator.add)
         "workflow_status": "running",
         "query": query,
         "companies": companies,

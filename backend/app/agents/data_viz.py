@@ -162,7 +162,7 @@ Recommend 3-5 visualizations for this research report.""")
 
         return {
             "visualizations": visualizations,
-            # Don't update current_agent (runs in parallel with Content Synthesizer)
+            "current_agent": [self.name],  # List for operator.add (parallel-safe)
             "current_phase": "synthesis",  # Match Content Synthesizer (same parallel stage)
             "cost_tracking": {
                 **state.get("cost_tracking", {}),
