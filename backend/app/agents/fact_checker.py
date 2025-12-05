@@ -145,7 +145,7 @@ Follow this structure exactly with proper markdown formatting.""")
                     return {
                         "fact_check_results": [fact_check_result],
                         "validated_claims": [],
-                        "current_agent": self.name,
+                        "current_agent": [self.name],  # List for operator.add
                         "current_phase": "validation",
                         "workflow_status": "failed",
                         "errors": [{
@@ -173,7 +173,7 @@ Follow this structure exactly with proper markdown formatting.""")
         return {
             "fact_check_results": [fact_check_result],
             "validated_claims": [],  # Could parse report into structured claims
-            "current_agent": self.name,
+            "current_agent": [self.name],  # List for operator.add
             "current_phase": "validation",
             "cost_tracking": {
                 **state.get("cost_tracking", {}),

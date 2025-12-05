@@ -48,7 +48,7 @@ class MarketResearchState(TypedDict):
     # Core workflow tracking
     messages: Annotated[List[BaseMessage], operator.add]
     current_phase: WorkflowPhase
-    current_agent: str
+    current_agent: Annotated[List[str], operator.add]  # List of active agents (supports parallel execution)
     workflow_status: WorkflowStatus
 
     # Input

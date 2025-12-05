@@ -207,7 +207,7 @@ Follow this structure exactly with proper markdown formatting.""")
 
         return {
             "comparative_analysis": comparative_analysis,
-            "current_agent": self.name,
+            "current_agent": [self.name],  # List for operator.add
             "current_phase": "analysis",
             "cost_tracking": {
                 **state.get("cost_tracking", {}),

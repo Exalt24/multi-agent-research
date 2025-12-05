@@ -161,7 +161,7 @@ Follow this structure exactly with proper markdown formatting.""")
         return {
             "research_findings": findings,
             "competitor_profiles": profiles,
-            # Don't update current_agent (runs in parallel with Financial Intel)
+            "current_agent": [self.name],  # List for operator.add (parallel-safe)
             "current_phase": "research",
             "cost_tracking": {
                 **state.get("cost_tracking", {}),
