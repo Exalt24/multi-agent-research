@@ -63,7 +63,7 @@ Analyze the query and output JSON with this EXACT structure:
     "financial_intel": "standard",
     "data_viz": "standard"
   }},
-  "user_plan": "## Research Strategy\\n\\n### Objectives\\n- Find pricing...\\n\\n### Approach\\n- Focus on..."
+  "user_plan": "### Objectives\\n- Compare pricing models...\\n\\n### Focus Areas\\n- Notion: collaboration features...\\n\\n### Success Criteria\\n- Pricing data for all companies..."
 }}
 ```
 
@@ -73,7 +73,11 @@ Guidelines:
 - financial_priorities: List 3-5 key financial metrics to collect (revenue, funding, valuation, growth_rate, etc.)
 - comparison_angles: List 3-5 dimensions for comparing companies (features, pricing, performance, etc.)
 - depth_settings: Set depth for each agent type: "light", "standard", or "comprehensive"
-- user_plan: Markdown-formatted strategy for users to read (include objectives, approach, focus areas)
+- user_plan: Markdown content ONLY (NO headers like "# Research Strategy" - frontend already has the header)
+
+CRITICAL for user_plan: Do NOT include "# Research Strategy" or "## Research Strategy" as a header.
+Just write the strategy content directly with subsections like "### Objectives", "### Focus Areas", etc.
+The UI already displays "Research Strategy" as the section title.
 
 Be specific and actionable. Think like a research director giving clear instructions to analysts.""",
                 ),
@@ -147,7 +151,7 @@ Generate the strategic research guidance in JSON format.""",
             financial_priorities = ["funding", "revenue", "growth"]
             comparison_angles = ["features", "pricing", "market_position"]
             depth_settings = {"web_research": depth, "financial_intel": depth, "data_viz": "standard"}
-            user_plan = f"## Research Strategy\n\n### Query\n{query}\n\n### Companies\n{', '.join(companies)}\n\n### Approach\nComprehensive competitive analysis."
+            user_plan = f"### Query\n{query}\n\n### Companies\n{', '.join(companies)}\n\n### Approach\nComprehensive competitive analysis with focus on key differentiators."
 
         await self._emit_status("running", 90, "Strategic guidance ready")
 
