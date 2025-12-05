@@ -170,12 +170,12 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
 @app.post("/api/research", response_model=ResearchResponse)
 @limiter.limit("5/minute")  # Limit to 5 research requests per minute (protects Tavily quota)
-async def start_research(request: ResearchRequest, req: Request):
+async def start_research(body: ResearchRequest, request: Request):
     """Start a research workflow.
 
     Args:
-        request: Research request with query and companies
-        req: FastAPI Request object (required for rate limiting)
+        body: Research request with query and companies
+        request: FastAPI Request object (required for rate limiting - must be named 'request')
 
     Returns:
         Session ID to connect to WebSocket for real-time updates
@@ -188,8 +188,8 @@ async def start_research(request: ResearchRequest, req: Request):
     import uuid
 
     try:
-        print(f">>> Starting research: {request.query}")
-        print(f"Companies: {', '.join(request.companies)}")
+        print(f">>> Starting research: {body.query}")
+        print(f"Companies: {', '.join(body.companies)}")
 
         # Get WebSocket manager
         ws_manager = get_ws_manager()
@@ -209,9 +209,9 @@ async def start_research(request: ResearchRequest, req: Request):
                 })
 
                 final_state = await run_research(
-                    query=request.query,
-                    companies=request.companies,
-                    analysis_depth=request.analysis_depth,
+                    query=body.query,
+                    companies=body.companies,
+                    analysis_depth=body.analysis_depth,
                     session_id=session_id
                 )
                 print(f">>> Research completed for session {session_id}")
@@ -246,7 +246,7 @@ async def start_research(request: ResearchRequest, req: Request):
         return ResearchResponse(
             session_id=session_id,
             status="started",
-            message=f"Research started for {len(request.companies)} companies. Connect to WebSocket for updates.",
+            message=f"Research started for {len(body.companies)} companies. Connect to WebSocket for updates.",
             data={}
         )
 
