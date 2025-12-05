@@ -5,6 +5,7 @@ from langchain_core.language_models import BaseLLM
 from langchain_core.prompts import ChatPromptTemplate
 from .base import BaseAgent
 from .state import MarketResearchState
+from ..core.tokens import truncate_to_token_limit
 import json
 
 
@@ -29,19 +30,32 @@ class DataVisualizationAgent(BaseAgent):
             ("system", """You are a data visualization expert.
 
 Recommend charts for the research data. For each recommendation:
-1. Chart type (bar, line, radar, scatter, etc.)
+1. Chart type (MUST be: bar, line, pie, or doughnut - these are rendered by frontend)
 2. What it shows
 3. Why it's useful
-4. Data structure needed
+4. Chart.js data structure
 
-Output as JSON array:
+SUPPORTED CHART TYPES (frontend ChartRenderer supports these):
+- **bar**: Side-by-side comparisons (features, metrics, scores)
+- **line**: Trends, growth, progression
+- **pie**: Distribution, market share, percentages
+- **doughnut**: Similar to pie with center space
+
+Output as JSON array with Chart.js data format:
 [
   {{
     "title": "Chart title",
-    "type": "bar|line|radar|scatter|pie",
+    "type": "bar|line|pie|doughnut",
     "description": "What it shows",
     "reason": "Why useful",
-    "data_keys": ["key1", "key2"]
+    "data": {{
+      "labels": ["Company A", "Company B"],
+      "datasets": [{{
+        "label": "Metric name",
+        "data": [85, 92],
+        "backgroundColor": ["#0ea5e9", "#8b5cf6"]
+      }}]
+    }}
   }}
 ]"""),
             ("human", """Companies: {companies}
@@ -66,10 +80,18 @@ Recommend 3-5 visualizations for this research report.""")
 
         await self._emit_status("running", 20, "Recommending visualizations...")
 
+        # Truncate analysis to fit context window (use actual model for accurate truncation)
+        analysis_truncated = truncate_to_token_limit(
+            analysis,
+            max_tokens=3000,
+            model_name=self._get_model_name(),
+            suffix="... (analysis truncated for length)"
+        )
+
         # Get recommendations from LLM
         messages = self.viz_prompt.format_messages(
             companies=", ".join(companies),
-            analysis=analysis[:2000]  # Limit for token management
+            analysis=analysis_truncated
         )
 
         response = await self.llm.ainvoke(messages)
@@ -88,22 +110,38 @@ Recommend 3-5 visualizations for this research report.""")
                 json_str = recommendations
 
             chart_specs = json.loads(json_str)
-        except:
-            # Fallback: default charts
+        except (json.JSONDecodeError, ValueError, IndexError) as e:
+            print(f"[!] Failed to parse chart specs from LLM: {e}")
+            print(f"[!] LLM response was: {recommendations[:200]}...")
+            # Fallback: default charts (using types supported by frontend ChartRenderer)
             chart_specs = [
                 {
-                    "title": "Feature Comparison",
-                    "type": "radar",
-                    "description": "Compare features across companies",
-                    "reason": "Shows multi-dimensional comparison",
-                    "data_keys": companies
+                    "title": "Company Comparison",
+                    "type": "bar",
+                    "description": "Compare key metrics across companies",
+                    "reason": "Shows clear side-by-side comparison",
+                    "data": {
+                        "labels": companies,
+                        "datasets": [{
+                            "label": "Overall Score",
+                            "data": [85, 88, 75],
+                            "backgroundColor": ["#0ea5e9", "#8b5cf6", "#f97316"]
+                        }]
+                    }
                 },
                 {
-                    "title": "Market Positioning",
-                    "type": "scatter",
-                    "description": "Position companies on price vs features",
+                    "title": "Market Distribution",
+                    "type": "pie",
+                    "description": "Market share distribution",
                     "reason": "Visual market positioning",
-                    "data_keys": ["price", "features"]
+                    "data": {
+                        "labels": companies,
+                        "datasets": [{
+                            "label": "Market Share",
+                            "data": [45, 35, 20],
+                            "backgroundColor": ["#0ea5e9", "#8b5cf6", "#f97316"]
+                        }]
+                    }
                 }
             ]
 

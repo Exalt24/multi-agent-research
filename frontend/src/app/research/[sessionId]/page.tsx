@@ -1,8 +1,12 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import AgentCard from "@/components/AgentCard";
+import AgentCardSkeleton from "@/components/AgentCardSkeleton";
+import ChartRenderer from "@/components/ChartRenderer";
+import ApprovalModal from "@/components/ApprovalModal";
+import { exportToPDF } from "@/utils/pdfExport";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -30,8 +34,34 @@ const AGENTS = [
 
 export default function ResearchPage({ params }: PageProps) {
   const { sessionId } = use(params);
-  const { agentStatuses, isConnected, error, finalResults, workflowComplete } =
+  const { agentStatuses, isConnected, error, finalResults, workflowComplete, pendingApproval, researchPlan } =
     useWebSocket(sessionId);
+  const [exportingPDF, setExportingPDF] = useState(false);
+
+  // Handle approval responses
+  const handleApproval = async (decision: string, feedback?: string) => {
+    if (!pendingApproval) return;
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+      await fetch(`${apiUrl}/api/approval/respond`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          approval_id: pendingApproval.approval_id,
+          decision: decision.toLowerCase().includes("continue") || decision.toLowerCase().includes("approve") ? "approve" : "reject",
+          feedback: feedback,
+        }),
+      });
+    } catch (error) {
+      console.error("Failed to submit approval:", error);
+      alert("Failed to submit approval. Please try again.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-900 to-gray-900 text-white">
@@ -67,19 +97,25 @@ export default function ResearchPage({ params }: PageProps) {
 
         {/* Agent Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {AGENTS.map((agent) => {
-            const status = agentStatuses[agent.name];
-            return (
-              <AgentCard
-                key={agent.name}
-                name={agent.name}
-                description={agent.description}
-                status={status?.status || "pending"}
-                progress={status?.progress || 0}
-                message={status?.message || "Waiting to start..."}
-              />
-            );
-          })}
+          {Object.keys(agentStatuses).length === 0 ? (
+            // Show skeletons before workflow starts
+            AGENTS.map((agent) => <AgentCardSkeleton key={agent.name} />)
+          ) : (
+            // Show actual agent cards once workflow has started
+            AGENTS.map((agent) => {
+              const status = agentStatuses[agent.name];
+              return (
+                <AgentCard
+                  key={agent.name}
+                  name={agent.name}
+                  description={agent.description}
+                  status={status?.status || "pending"}
+                  progress={status?.progress || 0}
+                  message={status?.message || "Waiting to start..."}
+                />
+              );
+            })
+          )}
         </div>
 
         {/* Overall Progress */}
@@ -108,6 +144,50 @@ export default function ResearchPage({ params }: PageProps) {
             ))}
           </div>
         </div>
+
+        {/* Research Plan (from Coordinator) */}
+        {researchPlan && (
+          <div className="mt-8 bg-gradient-to-br from-blue-900/30 to-purple-900/30 backdrop-blur-sm rounded-xl p-6 border border-blue-700/50">
+            <h2 className="text-xl font-semibold mb-4 text-blue-400">
+              Research Strategy
+            </h2>
+            <div className="prose prose-invert max-w-none">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                components={{
+                  h2: (props) => (
+                    <h2
+                      className="text-base font-semibold mb-2 mt-3 text-purple-400"
+                      {...props}
+                    />
+                  ),
+                  h3: (props) => (
+                    <h3
+                      className="text-sm font-semibold mb-2 mt-2 text-purple-300"
+                      {...props}
+                    />
+                  ),
+                  p: (props) => (
+                    <p className="mb-2 text-gray-300 text-sm leading-relaxed" {...props} />
+                  ),
+                  ul: (props) => (
+                    <ul className="mb-2 ml-5 space-y-1 list-disc text-sm" {...props} />
+                  ),
+                  li: (props) => <li className="text-gray-300" {...props} />,
+                  strong: (props) => (
+                    <strong className="text-white font-semibold" {...props} />
+                  ),
+                }}
+              >
+                {researchPlan}
+              </ReactMarkdown>
+            </div>
+            <p className="text-xs text-gray-500 mt-4 italic">
+              This plan guides the research agents in collecting and analyzing data.
+            </p>
+          </div>
+        )}
 
         {/* Final Results */}
         {workflowComplete && finalResults && (
@@ -376,12 +456,53 @@ export default function ResearchPage({ params }: PageProps) {
                 </div>
               )}
 
+            {/* Visualizations */}
+            {finalResults.visualizations &&
+              finalResults.visualizations.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-4">
+                    Data Visualizations
+                  </h3>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {finalResults.visualizations.map((chart, index) => (
+                      <ChartRenderer key={index} chart={chart} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
             {/* Download Buttons */}
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-wrap">
+              <button
+                onClick={async () => {
+                  setExportingPDF(true);
+                  try {
+                    await exportToPDF({
+                      sessionId,
+                      ...finalResults,
+                    });
+                  } catch (error) {
+                    console.error("PDF export failed:", error);
+                    alert("Failed to export PDF. Please try again.");
+                  } finally {
+                    setExportingPDF(false);
+                  }
+                }}
+                disabled={exportingPDF}
+                className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-all"
+              >
+                {exportingPDF ? "Generating PDF..." : "Download PDF (with Charts)"}
+              </button>
+
               <button
                 onClick={() => {
                   // Create markdown content
                   let markdownContent = "# Market Research Report\n\n";
+
+                  if (finalResults.research_plan) {
+                    markdownContent += "## Research Strategy\n\n";
+                    markdownContent += finalResults.research_plan + "\n\n";
+                  }
 
                   if (finalResults.executive_summary) {
                     markdownContent += "## Executive Summary\n\n";
@@ -409,9 +530,9 @@ export default function ResearchPage({ params }: PageProps) {
                   a.click();
                   URL.revokeObjectURL(url);
                 }}
-                className="bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-3 rounded-lg font-semibold"
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-all"
               >
-                Download Report (.md)
+                Download Markdown (.md)
               </button>
 
               <button
@@ -427,12 +548,20 @@ export default function ResearchPage({ params }: PageProps) {
                   a.click();
                   URL.revokeObjectURL(url);
                 }}
-                className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold"
+                className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold transition-all"
               >
-                Download Data (.json)
+                Download JSON Data
               </button>
             </div>
           </div>
+        )}
+
+        {/* Approval Modal (HITL) */}
+        {pendingApproval && (
+          <ApprovalModal
+            approval={pendingApproval}
+            onRespond={handleApproval}
+          />
         )}
       </div>
     </div>
