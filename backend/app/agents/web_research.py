@@ -128,7 +128,7 @@ Follow this structure exactly with proper markdown formatting.""")
             )
 
             # Research this company with strategic guidance from coordinator
-            company_data = await self._research_company(company, query, state)
+            company_data = await self._research_company(company, query, state, progress=progress)
             findings.append(company_data)
             profiles[company] = company_data
 
@@ -166,7 +166,7 @@ Follow this structure exactly with proper markdown formatting.""")
             "cost_tracking": [cost_info],  # List for operator.add (parallel-safe)
         }
 
-    async def _research_company(self, company: str, query: str, state: MarketResearchState) -> Dict[str, Any]:
+    async def _research_company(self, company: str, query: str, state: MarketResearchState, progress: float = 50.0) -> Dict[str, Any]:
         """Research a single company using coordinator's strategic guidance.
 
         Args:
@@ -217,7 +217,8 @@ Follow this structure exactly with proper markdown formatting.""")
 
         # For comprehensive depth, scrape top URLs for full content (not just snippets)
         if web_depth == "comprehensive" and all_results:
-            await self._emit_status("running", int(progress) + 5, f"Scraping full content for {company}...")
+            scrape_progress = min(int(progress) + 5, 99)
+            await self._emit_status("running", scrape_progress, f"Scraping full content for {company}...")
 
             # Scrape top 2 URLs for complete context
             urls_to_scrape = [r["url"] for r in all_results[:2]]
