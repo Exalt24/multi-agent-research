@@ -147,7 +147,7 @@ export default function ResearchPage({ params }: PageProps) {
 
         {/* Research Plan (from Coordinator) */}
         {researchPlan && (
-          <div className="mt-8 bg-gradient-to-br from-blue-900/30 to-purple-900/30 backdrop-blur-sm rounded-xl p-6 border border-blue-700/50">
+          <div className="mt-8 bg-linear-to-br from-blue-900/30 to-purple-900/30 backdrop-blur-sm rounded-xl p-6 border border-blue-700/50">
             <h2 className="text-xl font-semibold mb-4 text-blue-400">
               Research Strategy
             </h2>
@@ -174,7 +174,6 @@ export default function ResearchPage({ params }: PageProps) {
                   ul: (props) => (
                     <ul className="mb-2 ml-5 space-y-1 list-disc text-sm" {...props} />
                   ),
-                  li: (props) => <li className="text-gray-300" {...props} />,
                   strong: (props) => (
                     <strong className="text-white font-semibold" {...props} />
                   ),
@@ -236,9 +235,6 @@ export default function ResearchPage({ params }: PageProps) {
                           className="mb-3 ml-5 space-y-1 list-decimal"
                           {...props}
                         />
-                      ),
-                      li: (props) => (
-                        <li className="text-gray-300" {...props} />
                       ),
                       strong: (props) => (
                         <strong
@@ -303,12 +299,6 @@ export default function ResearchPage({ params }: PageProps) {
                       ol: (props) => (
                         <ol
                           className="mb-4 ml-6 space-y-2 list-decimal list-outside"
-                          {...props}
-                        />
-                      ),
-                      li: (props) => (
-                        <li
-                          className="text-gray-200 leading-relaxed"
                           {...props}
                         />
                       ),
@@ -429,20 +419,17 @@ export default function ResearchPage({ params }: PageProps) {
                                     {...props}
                                   />
                                 ),
-                                ul: (props) => (
-                                  <ul
-                                    className="mb-3 ml-5 space-y-1 list-disc"
-                                    {...props}
-                                  />
-                                ),
-                                li: (props) => (
-                                  <li className="text-gray-300" {...props} />
-                                ),
-                                strong: (props) => (
-                                  <strong
-                                    className="text-white font-semibold"
-                                    {...props}
-                                  />
+                      ul: (props) => (
+                        <ul
+                          className="mb-3 ml-5 space-y-1 list-disc"
+                          {...props}
+                        />
+                      ),
+                      strong: (props) => (
+                        <strong
+                          className="text-white font-semibold"
+                          {...props}
+                        />
                                 ),
                               }}
                             >
@@ -489,7 +476,7 @@ export default function ResearchPage({ params }: PageProps) {
                   }
                 }}
                 disabled={exportingPDF}
-                className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-all"
+                className="bg-linear-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-all"
               >
                 {exportingPDF ? "Generating PDF..." : "Download PDF (with Charts)"}
               </button>
@@ -530,7 +517,7 @@ export default function ResearchPage({ params }: PageProps) {
                   a.click();
                   URL.revokeObjectURL(url);
                 }}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-all"
+                className="bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-all"
               >
                 Download Markdown (.md)
               </button>

@@ -11,7 +11,7 @@ interface ResearchResults {
     type: string;
     description: string;
   }>;
-  cost_tracking: Array<Record<string, any>>;  // List of per-agent cost info (parallel-safe)
+  cost_tracking: Array<Record<string, unknown>>; // List of per-agent cost info (parallel-safe)
 }
 
 interface AgentStatus {
@@ -27,7 +27,7 @@ interface ApprovalRequest {
   approval_id: string;
   agent: string;
   question: string;
-  context: Record<string, any>;
+  context: Record<string, unknown>;
   options: string[];
 }
 
@@ -44,7 +44,7 @@ interface WebSocketMessage {
   // HITL fields
   approval_id?: string;
   question?: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   options?: string[];
 }
 
@@ -58,7 +58,8 @@ export function useWebSocket(sessionId: string) {
     null
   );
   const [workflowComplete, setWorkflowComplete] = useState(false);
-  const [pendingApproval, setPendingApproval] = useState<ApprovalRequest | null>(null);
+  const [pendingApproval, setPendingApproval] =
+    useState<ApprovalRequest | null>(null);
   const [researchPlan, setResearchPlan] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const workflowCompleteRef = useRef(false);
@@ -104,10 +105,14 @@ export function useWebSocket(sessionId: string) {
             }));
 
             // If Coordinator completed, extract research plan from data
-            if (agentName === "Coordinator Agent" && message.status === "completed" && message.data) {
-              const data = message.data as Record<string, any>;
-              if (data.research_plan) {
-                setResearchPlan(data.research_plan as string);
+            if (
+              agentName === "Coordinator Agent" &&
+              message.status === "completed" &&
+              message.data
+            ) {
+              const data = message.data as Record<string, unknown>;
+              if (typeof data.research_plan === "string") {
+                setResearchPlan(data.research_plan);
               }
             }
           } else if (message.type === "approval_request") {
@@ -116,7 +121,7 @@ export function useWebSocket(sessionId: string) {
               approval_id: message.approval_id || "",
               agent: message.agent || "",
               question: message.question || "",
-              context: (message.context as Record<string, any>) || {},
+              context: (message.context as Record<string, unknown>) || {},
               options: message.options || ["Approve", "Reject"],
             });
           } else if (message.type === "approval_received") {

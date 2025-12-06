@@ -8,7 +8,13 @@
  */
 
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+
+interface VisualizationSummary {
+  title?: string;
+  type?: string;
+  description?: string;
+  [key: string]: unknown;
+}
 
 interface ExportData {
   sessionId: string;
@@ -19,7 +25,7 @@ interface ExportData {
     analysis_text?: string;
   };
   competitor_profiles?: Record<string, { analysis: string }>;
-  visualizations?: any[];
+  visualizations?: VisualizationSummary[];
 }
 
 /**
@@ -151,7 +157,7 @@ export async function exportToPDF(
       } else if (line.startsWith("### ")) {
         addHeading(line.replace("### ", ""), 3);
       } else if (line.trim().startsWith("- ")) {
-        addText("  • " + line.replace(/^-\s*/, ""));
+        addText("  - " + line.replace(/^-\s*/, ""));
       } else if (line.trim()) {
         addText(line);
       } else {
@@ -216,7 +222,7 @@ export async function exportToPDF(
         if (data.visualizations[i].title) {
           pdf.setFontSize(10);
           pdf.setFont("helvetica", "italic");
-          pdf.text(data.visualizations[i].title, pageWidth / 2, yPosition, {
+          pdf.text(data.visualizations[i].title || "", pageWidth / 2, yPosition, {
             align: "center",
           });
           yPosition += 10;

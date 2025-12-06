@@ -12,6 +12,7 @@ import {
   Tooltip,
   Legend,
   ChartOptions,
+  ChartType,
 } from "chart.js";
 import { Bar, Line, Pie, Doughnut } from "react-chartjs-2";
 
@@ -30,10 +31,10 @@ ChartJS.register(
 
 interface ChartData {
   id?: string;
-  type: "bar" | "line" | "pie" | "doughnut";
+  type: ChartType | string;
   title: string;
   description?: string;
-  data: {
+  data?: {
     labels: string[];
     datasets: {
       label: string;
@@ -43,16 +44,16 @@ interface ChartData {
       borderWidth?: number;
     }[];
   };
-  options?: ChartOptions;
+  options?: ChartOptions<ChartType>;
 }
 
 interface ChartRendererProps {
-  chart: ChartData | any; // Allow any for flexibility with backend data
+  chart: ChartData;
 }
 
 export default function ChartRenderer({ chart }: ChartRendererProps) {
   // Default options for all charts
-  const defaultOptions: ChartOptions = {
+  const defaultOptions: ChartOptions<ChartType> = {
     responsive: true,
     maintainAspectRatio: true,
     plugins: {
@@ -105,8 +106,14 @@ export default function ChartRenderer({ chart }: ChartRendererProps) {
         : undefined,
   };
 
+  const safeData =
+    chart.data ?? {
+      labels: [],
+      datasets: [],
+    };
+
   // Merge with custom options from agent
-  const finalOptions = {
+  const finalOptions: ChartOptions<ChartType> = {
     ...defaultOptions,
     ...chart.options,
   };
@@ -115,13 +122,13 @@ export default function ChartRenderer({ chart }: ChartRendererProps) {
   const renderChart = () => {
     switch (chart.type) {
       case "bar":
-        return <Bar data={chart.data} options={finalOptions} />;
+        return <Bar data={safeData} options={finalOptions as ChartOptions<"bar">} />;
       case "line":
-        return <Line data={chart.data} options={finalOptions} />;
+        return <Line data={safeData} options={finalOptions as ChartOptions<"line">} />;
       case "pie":
-        return <Pie data={chart.data} options={finalOptions} />;
+        return <Pie data={safeData} options={finalOptions as ChartOptions<"pie">} />;
       case "doughnut":
-        return <Doughnut data={chart.data} options={finalOptions} />;
+        return <Doughnut data={safeData} options={finalOptions as ChartOptions<"doughnut">} />;
       default:
         return (
           <div className="text-red-400">
