@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 
+type ApprovalContext = {
+  report_preview?: string;
+  concerns?: string;
+  [key: string]: unknown;
+};
+
 interface ApprovalRequest {
   approval_id: string;
   agent: string;
   question: string;
-  context: {
-    report_preview?: string;
-    concerns?: string;
-    [key: string]: any;
-  };
+  context: ApprovalContext;
   options: string[];
 }
 
@@ -34,7 +36,7 @@ export default function ApprovalModal({
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-8 max-w-2xl w-full border-2 border-yellow-500/50 shadow-2xl">
+      <div className="bg-linear-to-br from-gray-800 to-gray-900 rounded-xl p-8 max-w-2xl w-full border-2 border-yellow-500/50 shadow-2xl">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
@@ -101,10 +103,10 @@ export default function ApprovalModal({
                 disabled={responding}
                 className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                   isStop
-                    ? "bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white"
+                    ? "bg-linear-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white"
                     : isContinue
-                    ? "bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
-                    : "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white"
+                    ? "bg-linear-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
+                    : "bg-linear-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white"
                 }`}
               >
                 {responding ? "Submitting..." : option}
