@@ -124,8 +124,8 @@ class SearchCacheService:
         # MD5 hash for compact key
         hash_key = hashlib.md5(cache_str.encode()).hexdigest()
 
-        # Add prefix to avoid conflicts with RAG cache or other Redis users
-        return f"search:{hash_key}"
+        # Add prefix to avoid conflicts with other projects sharing the same Redis instance
+        return f"mar:search:{hash_key}"
 
     def get(
         self,
@@ -232,7 +232,7 @@ class SearchCacheService:
             if self._use_redis and self._redis_client:
                 # Clear only our search cache keys (have "search:" prefix)
                 count = 0
-                for key in self._redis_client.scan_iter(match="search:*"):
+                for key in self._redis_client.scan_iter(match="mar:search:*"):
                     self._redis_client.delete(key)
                     count += 1
                 print(f"[i] Redis search cache cleared ({count} entries removed)")
@@ -253,7 +253,7 @@ class SearchCacheService:
         try:
             if self._use_redis and self._redis_client:
                 # Count only search cache keys
-                cached_entries = len(list(self._redis_client.scan_iter(match="search:*")))
+                cached_entries = len(list(self._redis_client.scan_iter(match="mar:search:*")))
                 cache_type = "redis"
             else:
                 cached_entries = len(self._in_memory_cache)
