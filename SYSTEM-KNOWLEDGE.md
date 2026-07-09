@@ -1,6 +1,6 @@
 # Multi-Agent Market Research Platform - System Knowledge
 
-**Technical Deep Dive for Interview Preparation**
+**Technical Deep Dive**
 
 ---
 
@@ -573,8 +573,6 @@ async def test_complete_workflow():
 3. **Optimization skills** - Had to optimize for free tier constraints
 4. **Scalability thinking** - Free tier forces you to think about efficiency
 
-**Interview point:** "I built this using only free tiers. Imagine what I can do with actual infrastructure."
-
 ### Free Tier Optimization Techniques
 
 1. **Local LLMs (Ollama)** - Unlimited calls in dev, learn model optimization
@@ -705,8 +703,6 @@ All clients get updates, handles reconnections gracefully.
 - RAG API must have relevant data to be useful
 - Adds latency (extra API call)
 
-**Interview point:** "The system demonstrates microservices composition - agents can optionally query my RAG project's API - but the core functionality doesn't depend on it."
-
 ---
 
 ## Production Patterns Applied
@@ -783,52 +779,6 @@ class ResearchRequest(BaseModel):
 
 **Challenge 4: WebSocket in FastAPI**
 - Solution: Used FastAPI's built-in WebSocket support, worked perfectly
-
----
-
-## Interview Talking Points
-
-### "Tell me about a complex system you built"
-
-"I built a multi-agent AI platform with 7 specialized agents orchestrated by LangGraph. The interesting challenge was state management - agents need to share data but run independently. I used LangGraph's TypedDict pattern with operator.add for accumulation, which automatically merges outputs.
-
-For example, the Web Research and Financial Intelligence agents both produce findings - LangGraph automatically combines them into a single list. This avoided manual state merging logic and made the system much cleaner."
-
-### "How do you handle errors in distributed systems?"
-
-"Each agent has retry logic with exponential backoff - 3 attempts with 1s, 2s, 4s delays. If all retries fail, the error is captured in the shared state but doesn't crash the workflow. Other agents can still run.
-
-I also implemented search tool fallbacks - Tavily API fails? Use DuckDuckGo. DuckDuckGo fails? Use web scraping. The research continues regardless of individual component failures."
-
-### "How do you optimize costs?"
-
-"I built this entire platform for $0/month using free tiers:
-- Groq for LLM (30 req/min free, 350+ tokens/sec)
-- Tavily for search (500/month free - protected with Redis caching and rate limiting)
-- Redis Cloud (search result caching with 1-hour TTL)
-- Render for backend (750 hours/month)
-- Vercel for frontend (unlimited)
-
-The key was designing for constraints - parallel execution for speed but with memory-safe patterns, Redis caching to save Tavily quota (5-10x speedup), rate limiting (5 req/min), and depth-based execution so light queries don't waste resources. These optimization strategies apply directly to production where cost and performance both matter."
-
-### "What's your experience with real-time systems?"
-
-"I implemented WebSocket monitoring so users can watch all 7 agents execute live. Each agent emits status updates (running, progress %, messages) which the WebSocket manager broadcasts to connected clients.
-
-The frontend uses React hooks to consume these updates and re-render agent cards in real-time. No polling - pure push-based communication. This pattern is critical for production AI systems where workflows can take minutes and users need visibility."
-
-### "How do you ensure system reliability?"
-
-"Multiple layers:
-1. **Retry logic** - 3 attempts with exponential backoff (1s, 2s, 4s)
-2. **Fallbacks** - Ollama → Groq, Tavily → DuckDuckGo, Redis → In-memory
-3. **Rate limiting** - 5 req/min prevents quota exhaustion
-4. **Redis caching** - 5-10x speedup, protects Tavily quota
-5. **Health checks** - /health, /api/cache/stats, /api/llm/health endpoints
-6. **Error accumulation** - operator.add collects errors from parallel agents
-7. **Timeout protection** - 120s per agent with asyncio.wait_for()
-8. **HITL quality gates** - Human can stop workflow if fact-check finds issues
-9. **Configuration validation** - Fail-fast on startup if API keys missing"
 
 ---
 
