@@ -192,7 +192,7 @@ Frontend runs at: `http://localhost:3000`
 - Redis-backed search caching (5-10x speedup, protects Tavily quota)
 - Dual search: Tavily API (premium) + DuckDuckGo (free fallback)
 - Web scraping for comprehensive depth (full page content)
-- RAG integration (queries Project 1 Enterprise RAG knowledge base)
+- RAG integration (queries the Enterprise RAG knowledge base)
 - Depth-based research: light (fast) / standard (balanced) / comprehensive (thorough)
 
 ✅ **Comprehensive Analysis**
@@ -278,14 +278,19 @@ curl -X POST http://localhost:8000/api/research \
 
 ### Deploy Backend to Render
 
-1. Go to https://dashboard.render.com/select-repo
-2. Select `multi-agent-research` repository
-3. Render will auto-detect `render.yaml`
+The backend ships as a Docker image (`backend/Dockerfile`), so deploy it as a Docker web service:
+
+1. Go to https://dashboard.render.com and create a new **Web Service**
+2. Connect this GitHub repository
+3. Set the runtime to **Docker** and point it at the backend:
+   - **Dockerfile Path:** `./backend/Dockerfile`
+   - **Docker Build Context Directory:** `./backend`
 4. Add environment variables:
    - `GROQ_API_KEY` (required)
    - `TAVILY_API_KEY` (required)
-   - `REDIS_URL` (optional, uses memory fallback)
-5. Deploy!
+   - `REDIS_URL` (optional, falls back to in-memory cache)
+   - `ENVIRONMENT=production`
+5. Deploy. The container exposes port 8000 and has a `/health` check built in.
 
 ### Deploy Frontend to Vercel
 
@@ -312,7 +317,7 @@ NEXT_PUBLIC_WS_URL=wss://your-backend.onrender.com
 - **Search:** Tavily API (primary), DuckDuckGo (fallback)
 - **Search Caching:** Redis (cloud-hosted)
 - **Web Scraping:** BeautifulSoup4, requests
-- **RAG Integration:** Project 1 Enterprise RAG API
+- **RAG Integration:** [Enterprise RAG Knowledge Base](https://github.com/Exalt24/enterprise-rag-knowledge-base) API
 
 ### Frontend
 - **Framework:** Next.js 16 (App Router, Turbopack)
@@ -352,7 +357,7 @@ multi-agent-research/
 │   │   │   ├── graph.py               # LangGraph with parallel execution
 │   │   │   └── tools/                 # Agent tools
 │   │   │       ├── search.py          # Tavily, DuckDuckGo, Redis cache
-│   │   │       └── rag_client.py      # Project 1 integration
+│   │   │       └── rag_client.py      # Enterprise RAG integration
 │   │   ├── api/
 │   │   │   ├── schemas.py             # Pydantic models + HITL schemas
 │   │   │   └── websocket.py           # WebSocket manager + HITL messages
@@ -364,7 +369,7 @@ multi-agent-research/
 │   │   │   ├── cache.py               # Redis search result caching
 │   │   │   └── hitl_manager.py        # Human-in-the-Loop approval manager
 │   │   └── main.py                    # FastAPI app with rate limiting
-│   ├── tests/
+│   ├── test_api.py                    # End-to-end API smoke test
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── .env.example
@@ -386,7 +391,6 @@ multi-agent-research/
 │   │       └── pdfExport.ts           # PDF generation with charts
 │   └── package.json
 │
-├── render.yaml                         # Render deployment config
 ├── README.md                           # User documentation
 └── SYSTEM-KNOWLEDGE.md                 # Technical deep dive
 ```
@@ -509,20 +513,17 @@ Notion, Coda, and ClickUp are leading project management platforms offering coll
 
 ## Development
 
-### Run Tests
+### Test API
+
+The backend ships an end-to-end smoke test (`backend/test_api.py`) that hits the running server. Start the backend first, then in another terminal:
 
 ```bash
 cd backend
-pytest tests/
-```
 
-### Test API
-
-```bash
 # Health check
 curl http://localhost:8000/health
 
-# Full workflow test
+# Full workflow test (health + research endpoint)
 python test_api.py
 ```
 
@@ -550,7 +551,7 @@ TAVILY_API_KEY=your_tavily_key          # Required for quality search
 # Redis (Search Result Caching)
 REDIS_URL=your_upstash_redis_url        # Optional, uses in-memory fallback
 
-# RAG Integration (Project 1)
+# RAG Integration (Enterprise RAG)
 RAG_API_URL=https://enterprise-rag-api.onrender.com/api
 
 # Application
@@ -605,7 +606,7 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8000              # Dev
 - [x] Redis search result caching (5-10x speedup)
 - [x] Accurate token counting (tiktoken with model auto-detection)
 - [x] Per-company and per-call cost tracking
-- [x] RAG integration (Project 1 Enterprise RAG)
+- [x] RAG integration (Enterprise RAG Knowledge Base)
 - [x] Human-in-the-Loop (HITL) approval gates with quality detection
 - [x] Chart rendering (Chart.js: bar, line, pie, doughnut)
 - [x] PDF export with embedded charts (jsPDF + html2canvas)
@@ -633,22 +634,15 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8000              # Dev
 
 ### Backend (Render)
 
-**Option A: One-Click Deploy (render.yaml)**
-1. Fork/clone this repo
-2. Visit https://dashboard.render.com/select-repo
-3. Select `multi-agent-research`
-4. Render auto-detects `render.yaml`
-5. Add environment variables (GROQ_API_KEY, TAVILY_API_KEY)
-6. Deploy!
+Deploy the backend as a Docker web service (there is no `render.yaml`, so configure it manually):
 
-**Option B: Manual Deploy**
 1. New Web Service on Render
-2. Connect GitHub repo
+2. Connect this GitHub repo
 3. Settings:
    - **Runtime:** Docker
    - **Dockerfile Path:** ./backend/Dockerfile
-   - **Docker Context:** ./backend
-4. Add environment variables
+   - **Docker Build Context Directory:** ./backend
+4. Add environment variables (see below)
 5. Deploy
 
 **Environment variables to add:**
@@ -704,17 +698,12 @@ vercel --prod --yes
 
 ## Testing
 
+With the backend running locally, run the end-to-end smoke test against it:
+
 ```bash
 cd backend
 
-# Run all tests
-pytest
-
-# Run specific tests
-pytest tests/unit/
-pytest tests/integration/
-
-# Test API manually
+# Runs the health check + a full research workflow against http://localhost:8000
 python test_api.py
 ```
 
@@ -749,7 +738,7 @@ python test_api.py
 - **Redis caching** for search results (5-10x speedup, quota protection)
 - **Accurate token counting** with tiktoken and model auto-detection
 - **Real-time WebSocket** with 6 message types (status, approval, completion, etc.)
-- **Microservices integration** (Project 1 RAG API, Project 2 Multi-Agent)
+- **Microservices integration** (calls the Enterprise RAG Knowledge Base API as a separate service)
 - **Complete feature set:** Charts, PDF export, HITL, caching, rate limiting, validation
 - **100% free tier** ($0/month production cost)
 - **Zero technical debt:** No deprecations, no dead code, no bare excepts
@@ -764,7 +753,7 @@ python test_api.py
 - **Microservice integration:** Async HTTP with httpx, error resilience, health checks
 - **Token accuracy:** tiktoken integration, model auto-detection (llama3 vs llama-3.3-70b)
 - **Quality gates:** HITL with keyword detection, approval timeout handling, workflow control
-- **End-to-end system:** Backend (FastAPI/LangGraph) + Frontend (Next.js/Chart.js) + Caching (Redis) + RAG (Project 1)
+- **End-to-end system:** Backend (FastAPI/LangGraph) + Frontend (Next.js/Chart.js) + Caching (Redis) + RAG (Enterprise RAG Knowledge Base)
 
 ---
 
