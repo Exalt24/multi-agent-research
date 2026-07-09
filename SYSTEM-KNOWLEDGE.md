@@ -336,7 +336,7 @@ class SearchManager:
 
 ### RAG Integration (Microservices)
 
-Web Research Agent queries Project 1's RAG API:
+Web Research Agent queries the Enterprise RAG Knowledge Base API:
 
 ```python
 class RAGClient:
@@ -691,7 +691,7 @@ All clients get updates, handles reconnections gracefully.
 
 **Pattern:** Agents can call other microservices as tools.
 
-**Implementation:** Web Research Agent has optional RAG client that queries Project 1's Enterprise RAG API.
+**Implementation:** Web Research Agent has optional RAG client that queries the Enterprise RAG Knowledge Base API.
 
 **Status:** Configured but optional - RAG API integration shows microservices pattern but isn't critical for core functionality.
 
@@ -866,7 +866,7 @@ The frontend uses React hooks to consume these updates and re-render agent cards
 5. **Accurate token counting** - tiktoken with model auto-detection (llama3 vs llama-3.3-70b)
 6. **Complete feature set** - Charts (Chart.js), PDF export, loading skeletons, rate limiting
 7. **Real-time WebSocket** - 6 message types, concurrent connections, HITL messages
-8. **Microservices integration** - Project 1 RAG as agent tool with async httpx
+8. **Microservices integration** - Enterprise RAG Knowledge Base as agent tool with async httpx
 9. **100% free tier** - Entire stack optimized for $0/month with quota protection
 10. **Production deployment** - Docker, health checks, validation, zero tech debt
 11. **Full-stack** - Backend (FastAPI/LangGraph) + Frontend (Next.js 16/Chart.js)
@@ -998,7 +998,7 @@ Designing for constraints (512MB RAM, rate limits, quotas) forces good architect
 7 agents hits the sweet spot - complex enough to demonstrate production orchestration (parallel stages, strategic coordination, state management) but focused enough to build with high quality. More agents would add complexity without proportional value. The coordinator pattern + parallel execution shows advanced LangGraph skills.
 
 ### Microservices Composition
-Integrating Project 1's RAG API shows how AI systems can be composed. Each project becomes a reusable building block.
+Integrating the Enterprise RAG Knowledge Base API shows how AI systems can be composed. Each service becomes a reusable building block.
 
 ---
 
