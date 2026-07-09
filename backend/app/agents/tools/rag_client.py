@@ -1,11 +1,11 @@
-"""RAG client to query Project 1's knowledge base."""
+"""RAG client to query the Enterprise RAG Knowledge Base."""
 
 import httpx
 from typing import Dict, Any, Optional
 
 
 class RAGClient:
-    """Client to query the Enterprise RAG Knowledge Base (Project 1)."""
+    """Client to query the Enterprise RAG Knowledge Base."""
 
     def __init__(self, base_url: str = "https://enterprise-rag-api.onrender.com/api"):
         self.base_url = base_url.rstrip("/")
