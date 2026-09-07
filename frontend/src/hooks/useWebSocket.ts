@@ -28,15 +28,20 @@ interface AgentStatus {
 }
 
 /**
- * The backend stamps these with Python's `time.time()`, which is SECONDS, while
- * `Date.now()` is milliseconds and is used as the fallback in the same expression.
- * Mixing the two silently yields durations out by a factor of a thousand, so
- * normalise once here rather than at each display site. Anything below ~1e12 cannot
- * be a millisecond epoch in this century, so it is seconds.
+ * Durations are measured from when the BROWSER saw the message, deliberately, not
+ * from any timestamp on the wire.
+ *
+ * The first version of this trusted `message.timestamp` and normalised it from
+ * seconds to milliseconds. Capturing the real websocket frames off production
+ * showed no usable numeric timestamp arrives on an `agent_status` frame at all, so
+ * that arithmetic ran against a near-zero value and rendered a 56-year duration
+ * ("29561951m 14s") on screen. Client arrival time also happens to be the more
+ * honest measure for this UI: what the viewer wants to know is how long the thing
+ * has been working from their point of view, which is immune to server clock skew
+ * and to unit confusion between the two ends.
  */
-function toMillis(ts: number | undefined): number {
-  if (!ts) return Date.now();
-  return ts < 1e12 ? ts * 1000 : ts;
+function observedNow(): number {
+  return Date.now();
 }
 
 interface ApprovalRequest {
@@ -111,7 +116,7 @@ export function useWebSocket(sessionId: string) {
             setAgentStatuses((prev) => {
               const previous = prev[agentName];
               const status = message.status || "unknown";
-              const at = toMillis(message.timestamp);
+              const at = observedNow();
               const terminal = status === "completed" || status === "failed";
 
               return {
