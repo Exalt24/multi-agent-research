@@ -37,6 +37,7 @@ class BaseAgent(ABC):
         self.timeout = timeout
         self._ws_manager = ws_manager
         self._session_id = None
+        self._fallback_index = 0
 
     def _get_model_name(self) -> str:
         """Detect the actual model name being used by this agent's LLM.
@@ -167,6 +168,35 @@ class BaseAgent(ABC):
             return min(float(match.group(1)) + 1.0, 30.0)
         return float(2 ** attempt)
 
+    def _is_rate_limit(self, exc: Exception) -> bool:
+        lowered = str(exc).lower()
+        return "rate_limit_exceeded" in lowered or "rate limit" in lowered
+
+    def _try_next_model(self) -> Optional[str]:
+        """Move this agent onto the next fallback model.
+
+        Groq meters per model, per minute AND per day, so a daily ceiling on
+        one model is not something waiting can fix. Another model is a separate
+        bucket, which is why this is a model switch rather than a longer sleep.
+
+        Returns the new model name, or None when the chain is used up.
+        """
+        from ..core.config import get_settings
+
+        chain = get_settings().fallback_llm_model_list
+        while self._fallback_index < len(chain):
+            candidate = chain[self._fallback_index]
+            self._fallback_index += 1
+            try:
+                from ..core.llm import get_groq_llm_for_model
+
+                self.llm = get_groq_llm_for_model(candidate)
+                logger.warning("%s falling back to model %s", self.name, candidate)
+                return candidate
+            except Exception as e:  # a bad name in the chain must not end the run
+                logger.warning("%s could not switch to %s: %s", self.name, candidate, e)
+        return None
+
     def _user_error(self, exc: Exception) -> str:
         """A short, safe message for the UI. Full detail goes to the log."""
         text = str(exc)
@@ -219,6 +249,13 @@ class BaseAgent(ABC):
                 logger.warning("%s attempt %d failed: %s", self.name, attempt + 1, e)
                 user_msg = self._user_error(e)
                 if attempt < self.max_retries - 1:
+                    switched = self._try_next_model() if self._is_rate_limit(e) else None
+                    if switched:
+                        await self._emit_status(
+                            "retrying", 50,
+                            f"{self.name} switching to a backup model"
+                        )
+                        continue
                     await self._emit_status("retrying", 50, user_msg)
                     await asyncio.sleep(self._retry_delay(e, attempt))
                 else:

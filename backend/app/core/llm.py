@@ -124,6 +124,24 @@ def get_groq_llm(temperature: float = 0.7) -> ChatGroq:
     return _llm_manager.get_groq_llm(temperature)
 
 
+def get_groq_llm_for_model(model: str, temperature: float = 0.7) -> ChatGroq:
+    """Build a Groq client pinned to one model.
+
+    Used when the default model is rate limited: quotas are per model, so
+    another model is a genuinely different bucket rather than the same wait.
+    Deliberately not cached, since this is the exception path.
+    """
+    if not settings.groq_api_key:
+        raise ValueError("GROQ_API_KEY not set in environment")
+
+    return ChatGroq(
+        api_key=settings.groq_api_key,
+        model_name=model,
+        temperature=temperature,
+        max_tokens=4096,
+    )
+
+
 def get_ollama_llm(temperature: float = 0.7) -> OllamaLLM:
     """Get Ollama LLM instance directly."""
     return _llm_manager.get_ollama_llm(temperature)
