@@ -1,12 +1,16 @@
 """Base agent class with retry logic and error handling."""
 
 import asyncio
+import logging
+import re
 import time
 from typing import Dict, Any, Optional, List
 from abc import ABC, abstractmethod
 from langchain_core.language_models import BaseLLM
 from .state import MarketResearchState
 from ..core.tokens import count_tokens, estimate_cost
+
+logger = logging.getLogger(__name__)
 
 
 class BaseAgent(ABC):
@@ -148,6 +152,35 @@ class BaseAgent(ABC):
 
         return response
 
+    # Provider errors arrive as one long JSON blob. Never put that on a user's
+    # screen: parse what we need out of it and show a plain sentence instead.
+    _RETRY_AFTER_RE = re.compile(r"try again in ([0-9]+(?:\.[0-9]+)?)s")
+
+    def _retry_delay(self, exc: Exception, attempt: int) -> float:
+        """Seconds to wait before the next attempt.
+
+        A provider rate limit tells us exactly how long to wait, and that wait
+        is usually far longer than a plain exponential backoff, so honour it.
+        """
+        match = self._RETRY_AFTER_RE.search(str(exc))
+        if match:
+            return min(float(match.group(1)) + 1.0, 30.0)
+        return float(2 ** attempt)
+
+    def _user_error(self, exc: Exception) -> str:
+        """A short, safe message for the UI. Full detail goes to the log."""
+        text = str(exc)
+        lowered = text.lower()
+        if "rate_limit_exceeded" in lowered or "rate limit" in lowered:
+            wait = self._RETRY_AFTER_RE.search(text)
+            suffix = f" (retrying in ~{round(float(wait.group(1)))}s)" if wait else ""
+            return f"{self.name} hit the model provider's rate limit{suffix}"
+        if "model_not_found" in lowered or "does not exist" in lowered:
+            return f"{self.name} could not reach the configured model"
+        if "timeout" in lowered or "timed out" in lowered:
+            return f"{self.name} timed out talking to the model"
+        return f"{self.name} could not complete this step"
+
     async def execute(self, state: MarketResearchState) -> Dict[str, Any]:
         """Execute agent with retry logic.
 
@@ -183,13 +216,14 @@ class BaseAgent(ABC):
                     return self._handle_error(error_msg, state)
 
             except Exception as e:
-                error_msg = f"{self.name} error: {str(e)}"
+                logger.warning("%s attempt %d failed: %s", self.name, attempt + 1, e)
+                user_msg = self._user_error(e)
                 if attempt < self.max_retries - 1:
-                    await self._emit_status("retrying", 50, error_msg)
-                    await asyncio.sleep(2 ** attempt)
+                    await self._emit_status("retrying", 50, user_msg)
+                    await asyncio.sleep(self._retry_delay(e, attempt))
                 else:
-                    await self._emit_status("failed", 100, error_msg)
-                    return self._handle_error(error_msg, state)
+                    await self._emit_status("failed", 100, user_msg)
+                    return self._handle_error(user_msg, state)
 
         return self._handle_error(f"{self.name} failed after {self.max_retries} attempts", state)
 
