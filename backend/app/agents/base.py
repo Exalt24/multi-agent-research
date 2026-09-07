@@ -38,7 +38,7 @@ class BaseAgent(ABC):
         """Detect the actual model name being used by this agent's LLM.
 
         Returns:
-            Model name for tiktoken (e.g., "llama-3.3-70b-versatile" or "llama3")
+            Model name for tiktoken (e.g., "openai/gpt-oss-120b" or "llama3")
 
         Note:
             Different LLM providers store model name in different attributes:
@@ -258,7 +258,7 @@ class BaseAgent(ABC):
         Note:
             Automatically detects which model this agent is using:
             - Development: "llama3" (Ollama model)
-            - Production: "llama-3.3-70b-versatile" (Groq model)
+            - Production: settings.default_llm_model (Groq model)
 
             This ensures accurate token counting and cost tracking for the actual model in use.
         """
