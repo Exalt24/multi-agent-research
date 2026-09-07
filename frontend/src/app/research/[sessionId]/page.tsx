@@ -112,6 +112,8 @@ export default function ResearchPage({ params }: PageProps) {
                   status={status?.status || "pending"}
                   progress={status?.progress || 0}
                   message={status?.message || "Waiting to start..."}
+                  startedAt={status?.startedAt}
+                  finishedAt={status?.finishedAt}
                 />
               );
             })

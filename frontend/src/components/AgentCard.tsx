@@ -1,9 +1,53 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 interface AgentCardProps {
   name: string;
   description: string;
   status: string;
   progress: number;
   message: string;
+  startedAt?: number;
+  finishedAt?: number;
+}
+
+/** "8s", "1m 12s". Seconds only under a minute, because that is the resolution anyone cares about here. */
+function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  if (total < 60) return `${total}s`;
+  return `${Math.floor(total / 60)}m ${String(total % 60).padStart(2, "0")}s`;
+}
+
+/**
+ * Elapsed time for one agent.
+ *
+ * This is the piece the reference pass said was missing: GitHub Actions shows a
+ * duration against every job ("2m 8s") and it is the main signal that a long run is
+ * progressing rather than hung. A percentage alone cannot carry that, because the
+ * percentages here are estimates for non-deterministic work.
+ *
+ * It ticks only while the agent is actually running, so a finished card is a fixed
+ * number and a queued card renders nothing at all rather than a misleading "0s".
+ */
+function Elapsed({ startedAt, finishedAt }: { startedAt?: number; finishedAt?: number }) {
+  const live = startedAt !== undefined && finishedAt === undefined;
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!live) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [live]);
+
+  if (startedAt === undefined) return null;
+  const end = finishedAt ?? now;
+
+  return (
+    <span className="tabular-nums" title={live ? "Time so far" : "Total time"}>
+      {formatDuration(end - startedAt)}
+    </span>
+  );
 }
 
 export default function AgentCard({
@@ -12,6 +56,8 @@ export default function AgentCard({
   status,
   progress,
   message,
+  startedAt,
+  finishedAt,
 }: AgentCardProps) {
   // "Not started yet" is a different thing from "started and at zero", and the UI
   // has to say which. Anything that is not a known active or finished state is
@@ -113,7 +159,10 @@ export default function AgentCard({
       <div className="mb-3">
         <div className="flex justify-between text-xs text-gray-400 mb-1">
           <span>Progress</span>
-          <span>{isQueued ? "Waiting its turn" : `${progress}%`}</span>
+          <span className="flex items-center gap-2">
+            {isQueued ? "Waiting its turn" : `${progress}%`}
+            {!isQueued && <Elapsed startedAt={startedAt} finishedAt={finishedAt} />}
+          </span>
         </div>
         <div
           className="w-full bg-gray-700 rounded-full h-2 overflow-hidden"
