@@ -21,6 +21,22 @@ interface AgentStatus {
   message: string;
   data: Record<string, unknown>;
   timestamp: number;
+  /** When this agent first reported running. Undefined while it is queued. */
+  startedAt?: number;
+  /** When it reached a terminal state, so a finished card can stop counting. */
+  finishedAt?: number;
+}
+
+/**
+ * The backend stamps these with Python's `time.time()`, which is SECONDS, while
+ * `Date.now()` is milliseconds and is used as the fallback in the same expression.
+ * Mixing the two silently yields durations out by a factor of a thousand, so
+ * normalise once here rather than at each display site. Anything below ~1e12 cannot
+ * be a millisecond epoch in this century, so it is seconds.
+ */
+function toMillis(ts: number | undefined): number {
+  if (!ts) return Date.now();
+  return ts < 1e12 ? ts * 1000 : ts;
 }
 
 interface ApprovalRequest {
@@ -92,17 +108,33 @@ export function useWebSocket(sessionId: string) {
 
           if (message.type === "agent_status" && message.agent) {
             const agentName = message.agent;
-            setAgentStatuses((prev) => ({
-              ...prev,
-              [agentName]: {
-                agent: agentName,
-                status: message.status || "unknown",
-                progress: message.progress || 0,
-                message: message.message || "",
-                data: (message.data as Record<string, unknown>) || {},
-                timestamp: message.timestamp || Date.now(),
-              },
-            }));
+            setAgentStatuses((prev) => {
+              const previous = prev[agentName];
+              const status = message.status || "unknown";
+              const at = toMillis(message.timestamp);
+              const terminal = status === "completed" || status === "failed";
+
+              return {
+                ...prev,
+                [agentName]: {
+                  agent: agentName,
+                  status,
+                  progress: message.progress || 0,
+                  message: message.message || "",
+                  data: (message.data as Record<string, unknown>) || {},
+                  timestamp: at,
+                  // Latch the first moment this agent was actually working. A
+                  // terminal message can be the first one we see if a step is
+                  // fast enough, so fall back to its own timestamp rather than
+                  // leaving a finished agent with no duration at all.
+                  startedAt:
+                    previous?.startedAt ??
+                    (status === "running" || terminal ? at : undefined),
+                  // Latch once, so a late duplicate cannot stretch the duration.
+                  finishedAt: previous?.finishedAt ?? (terminal ? at : undefined),
+                },
+              };
+            });
 
             // If Coordinator completed, extract research plan from data
             if (
