@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     # Constants (hardcoded defaults, rarely change)
     ollama_base_url: str = "http://localhost:11434"
     rag_api_url: str = "https://enterprise-rag-api.onrender.com/api"
+    fallback_llm_models: str = Field(
+        default="openai/gpt-oss-20b,qwen/qwen3.8-27b",
+        description="Comma-separated Groq models to fall back to when the "
+                    "default one is rate limited. Each model has its own quota, "
+                    "so a per-day ceiling on one does not end the run."
+    )
+
     default_llm_model: str = Field(
         default="openai/gpt-oss-120b",
         description="Groq model id for the cloud LLM. Override with the "
@@ -45,6 +52,16 @@ class Settings(BaseSettings):
 
     # CORS configuration
     cors_origins_env: str = Field(default="", description="Comma-separated list of additional CORS origins")
+
+    @property
+    def fallback_llm_model_list(self) -> list[str]:
+        """Fallback models, in order, with blanks and duplicates removed."""
+        seen = []
+        for name in self.fallback_llm_models.split(","):
+            name = name.strip()
+            if name and name != self.default_llm_model and name not in seen:
+                seen.append(name)
+        return seen
 
     @property
     def cors_origins(self) -> list[str]:

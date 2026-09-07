@@ -8,6 +8,31 @@ from .state import MarketResearchState
 from ..core.tokens import truncate_to_token_limit
 
 
+# Token budget.
+#
+# These numbers are sized against Groq's tokens-per-MINUTE ceiling, not against
+# a model's context window, because the minute ceiling is the smaller of the two
+# and it is what actually rejects a request. Groq charges a request as prompt +
+# max_tokens, and this agent makes TWO calls back to back, so one full pass has
+# to fit inside the minute budget or no amount of retrying will ever let it
+# through. That is the bug these numbers fix: the old budgets were sized for an
+# 8192-token CONTEXT window and asked for roughly 11,500 tokens a pass.
+#
+#   summary:  SUMMARY_ANALYSIS_TOKENS + template + SUMMARY_MAX_TOKENS
+#   report:   REPORT_RESEARCH_TOKENS + REPORT_ANALYSIS_TOKENS + template
+#             + REPORT_MAX_TOKENS
+#
+# The two together sit under TPM_BUDGET with room for the prompt templates.
+TPM_BUDGET = 8000  # Groq free tier, per model, per minute
+
+SUMMARY_ANALYSIS_TOKENS = 1200
+SUMMARY_MAX_TOKENS = 800
+
+REPORT_RESEARCH_TOKENS = 1600
+REPORT_ANALYSIS_TOKENS = 1000
+REPORT_MAX_TOKENS = 2200
+
+
 class ContentSynthesizerAgent(BaseAgent):
     """Agent that synthesizes all research into a final report.
 
@@ -141,7 +166,7 @@ Create a comprehensive research report following the EXACT structure above.""")
         analysis_with_objectives = analysis + objectives_text
         analysis_truncated = truncate_to_token_limit(
             analysis_with_objectives,
-            max_tokens=5000,
+            max_tokens=SUMMARY_ANALYSIS_TOKENS,
             model_name=self._get_model_name(),
             suffix="... (truncated for length)"
         )
@@ -150,7 +175,9 @@ Create a comprehensive research report following the EXACT structure above.""")
             query=query,
             analysis=analysis_truncated
         )
-        summary_response = await self.llm.ainvoke(summary_messages)
+        summary_response = await self.llm.bind(
+            max_tokens=SUMMARY_MAX_TOKENS
+        ).ainvoke(summary_messages)
         executive_summary = summary_response.content if hasattr(summary_response, 'content') else str(summary_response)
 
         # Track cost for executive summary generation
@@ -164,7 +191,7 @@ Create a comprehensive research report following the EXACT structure above.""")
         research_with_objectives = research_text + objectives_text
         research_truncated = truncate_to_token_limit(
             research_with_objectives,
-            max_tokens=4000,
+            max_tokens=REPORT_RESEARCH_TOKENS,
             model_name=self._get_model_name(),
             suffix="... (additional research truncated for length)"
         )
@@ -172,7 +199,7 @@ Create a comprehensive research report following the EXACT structure above.""")
         # Truncate analysis for report too (prevent context overflow)
         analysis_for_report = truncate_to_token_limit(
             analysis,
-            max_tokens=3000,
+            max_tokens=REPORT_ANALYSIS_TOKENS,
             model_name=self._get_model_name(),
             suffix="... (analysis truncated)"
         )
@@ -183,7 +210,9 @@ Create a comprehensive research report following the EXACT structure above.""")
             research=research_truncated,
             analysis=analysis_for_report
         )
-        report_response = await self.llm.ainvoke(report_messages)
+        report_response = await self.llm.bind(
+            max_tokens=REPORT_MAX_TOKENS
+        ).ainvoke(report_messages)
         final_report = report_response.content if hasattr(report_response, 'content') else str(report_response)
 
         # Track cost for full report generation
