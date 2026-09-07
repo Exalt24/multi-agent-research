@@ -119,7 +119,9 @@ COST_PER_MILLION_TOKENS = {
     "gpt-3.5-turbo": 0.50,  # GPT-3.5 Turbo
 
     # Groq (FREE during beta!)
-    "llama-3.3-70b-versatile": 0.00,  # Free!
+    "openai/gpt-oss-120b": 0.00,  # Free tier
+    "openai/gpt-oss-20b": 0.00,  # Free tier
+    "llama-3.3-70b-versatile": 0.00,  # Retired by Groq, kept for old records
     "mixtral-8x7b": 0.00,  # Free!
 
     # Ollama (local = free)
@@ -189,7 +191,9 @@ CONTEXT_WINDOW_SIZES = {
     "gpt-4": 8192,
     "gpt-4-turbo": 128000,
     "gpt-3.5-turbo": 16385,
-    "llama-3.3-70b-versatile": 8192,  # Groq Llama 3.3 70B
+    "openai/gpt-oss-120b": 131072,  # Groq GPT-OSS 120B
+    "openai/gpt-oss-20b": 131072,  # Groq GPT-OSS 20B
+    "llama-3.3-70b-versatile": 8192,  # Retired by Groq
     "mixtral-8x7b": 32768,
     "llama3": 8192,  # Ollama default
     "claude-3-opus": 200000,
@@ -305,7 +309,7 @@ def fibonacci(n: int) -> int:
 
     # Test 3: Cost estimation
     print("\n[3] Cost estimation:")
-    for model in ["gpt-4", "gpt-3.5-turbo", "llama-3.3-70b-versatile"]:
+    for model in ["gpt-4", "gpt-3.5-turbo", "openai/gpt-oss-120b"]:
         tokens = 10000
         cost = estimate_cost(tokens, model)
         print(f"  {model}: 10k tokens = ${cost:.4f}")
