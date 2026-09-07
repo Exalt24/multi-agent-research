@@ -27,7 +27,7 @@ class BaseAgent(ABC):
         self,
         name: str,
         llm: BaseLLM,
-        max_retries: int = 3,
+        max_retries: int = 5,
         timeout: int = 120,
         ws_manager = None,  # WebSocket manager
     ):
