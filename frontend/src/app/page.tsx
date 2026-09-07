@@ -71,33 +71,23 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Features */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
-            <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 border border-gray-700">
-              <div className="text-blue-400 font-semibold mb-2">
-                🔍 Deep Research
-              </div>
-              <div className="text-sm text-gray-400">
-                Web search, financial data, and market analysis
-              </div>
-            </div>
-            <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 border border-gray-700">
-              <div className="text-purple-400 font-semibold mb-2">
-                ⚡ Real-Time
-              </div>
-              <div className="text-sm text-gray-400">
-                Watch agents execute live with progress updates
-              </div>
-            </div>
-            <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 border border-gray-700">
-              <div className="text-green-400 font-semibold mb-2">
-                📊 Comprehensive
-              </div>
-              <div className="text-sm text-gray-400">
-                SWOT, comparisons, fact-checking, and visualizations
-              </div>
-            </div>
-          </div>
+          {/* What the system does, as ONE line rather than three stacked cards.
+              These were three bordered panels with emoji headings, and on a 390px
+              screen they stacked to roughly 300px and pushed the Companies input
+              and the Start Research button entirely below the fold, so the first
+              thing a visitor saw on a phone was marketing copy and no way to act.
+              The reference pass on Perplexity and the Vercel AI SDK site found the
+              input is the first interactive thing on the page in both cases.
+
+              The content is kept because it is genuinely informative, just demoted
+              to a single scannable line, and it stays ABOVE nothing: the form is
+              now the first thing you reach on a phone. Emoji are dropped rather
+              than aria-hidden, since the visible text already carries the meaning
+              and a screen reader announcing "chart increasing" adds nothing. */}
+          <p className="mb-8 text-sm text-gray-400">
+            Web search and financial data, agents executing live, and a written
+            report with SWOT, comparisons and fact-checking.
+          </p>
 
           {/* Form */}
           <form
