@@ -47,7 +47,7 @@ The content synthesizer carries the output of every upstream agent in its prompt
 
 ## LLM selection
 
-`core/llm.py`: with `ENVIRONMENT=production` the app uses Groq only. In development it tries Ollama first and falls back to Groq if Ollama is not running. The Groq model is `DEFAULT_LLM_MODEL` (default `openai/gpt-oss-120b`). It was hardcoded to `llama-3.3-70b-versatile` until Groq retired that model on 2026-09-07 and every agent started failing; making it a setting was the fix.
+`core/llm.py`: with `ENVIRONMENT=production` the app uses Groq only. In development it tries Ollama first and falls back to Groq if Ollama is not running. The Groq model is `DEFAULT_LLM_MODEL` (default `openai/gpt-oss-120b`). It was hardcoded to `llama-3.3-70b-versatile` until Groq retired that model in early September 2026 and every agent started failing; making it a setting was the fix.
 
 ## The approval gate
 

@@ -20,7 +20,7 @@ You give it a query and a list of companies. A coordinator agent plans the resea
 
 ## What broke
 
-On 2026-09-07 Groq retired the `llama-3.3-70b-versatile` model name, and this demo and the Enterprise RAG service it calls both started failing on the same day. Every agent died on a raw `model_not_found` error. The fix was to make the model a setting (`DEFAULT_LLM_MODEL`, default `openai/gpt-oss-120b`) so the next retirement is an environment variable change instead of a code change.
+In early September 2026 Groq retired the `llama-3.3-70b-versatile` model name, and this demo and the Enterprise RAG service it calls both started failing on the same day. Every agent died on a raw `model_not_found` error. The fix was to make the model a setting (`DEFAULT_LLM_MODEL`, default `openai/gpt-oss-120b`) so the next retirement is an environment variable change instead of a code change.
 
 That same week I found the content synthesizer could never succeed on the free tier: its two calls asked for roughly eleven thousand tokens against a per-minute ceiling of eight thousand. The token budgets are now named constants in `content_synthesizer.py`, and a rate-limited agent now moves to the next model in `FALLBACK_LLM_MODELS`, because Groq's quotas are per model, and once that list is used up it waits as long as Groq asks.
 
