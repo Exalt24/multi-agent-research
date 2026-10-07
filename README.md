@@ -1,266 +1,120 @@
 # Multi-Agent Market Research Platform
 
-**AI-powered competitive intelligence using 7 specialized agents orchestrated with LangGraph**
+Seven LangGraph agents that research a set of companies, fact-check the findings, and write a comparison report with charts.
 
-🔗 **Live Demo:** https://multi-agent-research-frontend.vercel.app
-⚙️ **API Endpoint:** https://multi-agent-research-api.onrender.com
+**Live demo:** https://multi-agent-research-frontend.vercel.app
+**API:** https://multi-agent-research-api.onrender.com (interactive docs at `/docs`)
 
----
-
-## Overview
-
-A production-ready multi-agent AI system that automates market research and competitive analysis. Seven specialized agents work together to gather data, analyze competitors, validate findings, and generate comprehensive reports with visualizations.
-
-### Key Metrics
-- **Time Reduction:** Manual research 6-8 hours → Agent system 1.75 minutes (200x+ faster with parallel execution)
-- **Agents:** 7 specialized agents with distinct roles (2 parallel execution stages)
-- **Cost:** $0/month (free tier APIs: Tavily, Groq, Redis Cloud)
-- **Real-Time:** WebSocket monitoring with Human-in-the-Loop approval gates
-- **Tech Stack:** LangGraph, FastAPI, Next.js 16, Ollama/Groq, Redis, Chart.js, tiktoken
+A full run takes a few minutes, and the demo runs on free tiers (Groq, Tavily, Render), so a run can hit Groq's free-tier limits and slow down or fail. The backend sleeps when idle, so the first request after a quiet spell is slow.
 
 ---
 
-## The 7 Agents
+## What it does
 
-| Agent | Role | Tools Used | Execution |
-|-------|------|------------|-----------|
-| **Coordinator** | Creates strategic plan with objectives, priorities, focus areas | LLM with JSON output | Sequential |
-| **Web Research** | Gathers competitive intelligence using coordinator's search priorities | Tavily, DuckDuckGo, Redis cache, web scraping, RAG API | **Parallel** (with Financial) |
-| **Financial Intelligence** | Researches funding, revenue, growth using coordinator's financial priorities | Tavily, DuckDuckGo, Redis cache, web scraping | **Parallel** (with Web) |
-| **Data Analyst** | Creates SWOT, feature matrix using coordinator's comparison angles | LLM analysis, web + financial data | Sequential |
-| **Fact Checker** | Validates claims with HITL approval gate if issues detected | LLM validation, human oversight | Sequential |
-| **Content Synthesizer** | Writes summary + report structured around coordinator's objectives | LLM generation (2 calls) | **Parallel** (with Data Viz) |
-| **Data Visualization** | Generates Chart.js specs for frontend rendering | LLM recommendations | **Parallel** (with Content Synth) |
+You give it a query and a list of companies. A coordinator agent plans the research, two agents gather web and financial data in parallel, an analyst builds SWOT and feature comparisons, a fact checker reviews the claims, and two more agents write the report and generate chart specs in parallel. Progress streams to the browser over a WebSocket while it runs. The result can be downloaded as PDF, Markdown or JSON.
+
+- **Agents:** 7, with two parallel stages (research, then output)
+- **Human in the loop:** one gate, in the fact checker (see below)
+- **Stack:** LangGraph, FastAPI, Next.js 16, Groq (Ollama for local development), Redis, Chart.js, tiktoken
+- **Cost:** runs on free tiers (Groq, Tavily, Render, Vercel), with Redis optional
+
+## What broke
+
+On 2026-09-07 Groq retired the `llama-3.3-70b-versatile` model name, and this demo and the Enterprise RAG service it calls both started failing on the same day. Every agent died on a raw `model_not_found` error. The fix was to make the model a setting (`DEFAULT_LLM_MODEL`, default `openai/gpt-oss-120b`) so the next retirement is an environment variable change instead of a code change.
+
+That same week I found the content synthesizer could never succeed on the free tier: its two calls asked for roughly eleven thousand tokens against a per-minute ceiling of eight thousand. The token budgets are now named constants in `content_synthesizer.py`, and a rate-limited agent now moves to the next model in `FALLBACK_LLM_MODELS`, because Groq's quotas are per model, and once that list is used up it waits as long as Groq asks.
 
 ---
+
+## The 7 agents
+
+| Agent | Role | Tools | Execution |
+|-------|------|-------|-----------|
+| **Coordinator** | Plans the run: objectives, search priorities, financial priorities, comparison angles, depth per agent | LLM with JSON output | Sequential |
+| **Web Research** | Gathers competitive intelligence using the coordinator's search priorities | Tavily, DuckDuckGo, search cache, page scraping, Enterprise RAG API | Parallel with Financial |
+| **Financial Intelligence** | Researches funding, revenue and growth | Tavily, DuckDuckGo, search cache, page scraping | Parallel with Web |
+| **Data Analyst** | SWOT and feature matrix, using the coordinator's comparison angles | LLM over web and financial data | Sequential |
+| **Fact Checker** | Reviews the analysis and can pause the run for a human decision | LLM, approval gate | Sequential |
+| **Content Synthesizer** | Writes the summary and the full report around the coordinator's objectives | LLM, two calls | Parallel with Data Viz |
+| **Data Visualization** | Produces Chart.js specs (bar, line, pie, doughnut) for the frontend | LLM | Parallel with Synthesizer |
+
+The coordinator's output is used, not decorative: its priorities become the search queries, its comparison angles go into the analyst's prompt, and its objectives frame the report. Its depth settings (light, standard, comprehensive) change how many queries, results, RAG chunks and scraped pages each agent uses.
+
+## The human-in-the-loop gate
+
+There is exactly one. After the fact checker writes its report, the backend looks for the words "unverified", "could not verify", "insufficient evidence" or "contradictory". If any appear, the run pauses and the browser shows an approval modal with a preview of the report and two choices, continue or stop. If nobody answers within 300 seconds, the run continues. If the approval mechanism itself errors, the run also continues.
 
 ## Architecture
 
 ```
-┌────────────────────────────────────────────────────┐
-│                   User Input                       │
-│          "Compare Notion vs Coda vs ClickUp"       │
-└──────────────────┬─────────────────────────────────┘
-                   │
-                   v
-┌──────────────────────────────────────────────────────┐
-│              FastAPI Backend (main.py)               │
-│         LangGraph + WebSocket + HITL + Redis         │
-└──────────────────┬───────────────────────────────────┘
-                   │
-      ┌────────────┴────────────┐
-      v                         v
-┌─────────────┐         ┌──────────────┐
-│ Coordinator │         │  WebSocket   │
-│   Agent     │         │   Manager    │
-│  (10s)      │         │ (Real-time)  │
-└──────┬──────┘         └──────┬───────┘
-       │                       │
-       │ Creates strategic     │
-       │ guidance:             │
-       │ - search_priorities   │
-       │ - financial_priorities│
-       │ - comparison_angles   │
-       │ - depth_settings      │
-       v                       │
-┌──────────────────────────────┴──────────────┐
-│         PARALLEL STAGE 1 (Research)         │
-│  Web Research (40s)  │  Financial Intel(30s)│
-│  - Uses priorities   │  - Uses priorities   │
-│  - Redis cache       │  - Redis cache       │
-│  - Web scraping      │  - Web scraping      │
-│  - RAG integration   │                      │
-└──────────────────┬──────────────────────────┘
-                   │ (Both complete)
-                   v
-┌──────────────────┐
-│  Data Analyst    │◄───── Real-time updates
-│     (20s)        │
-│ - Combines data  │
-│ - Uses angles    │
-└────────┬─────────┘
-         │
-         v
-┌──────────────────┐
-│  Fact Checker    │◄───── Real-time updates
-│     (15s)        │
-│ - HITL gate      │◄──┐
-│ - Human approval │   │ (if issues)
-└────────┬─────────┘   │
-         │             │
-         v             │
-┌──────────────────────┴──────────────────┐
-│       PARALLEL STAGE 2 (Output)         │
-│  Content Synth (20s) │  Data Viz (15s)  │
-│  - Uses objectives   │  - Chart.js      │
-│  - 2 LLM calls       │  - Frontend ready│
-└──────────┬──────────────────┬────────────┘
-           │                  │
-           v                  v
-     ┌──────────────┐    ┌──────────┐
-     │ Final Report │    │  Charts  │
-     │ - Summary    │    │ - Bar    │
-     │ - Full MD    │    │ - Line   │
-     │ - PDF export │    │ - Pie    │
-     └──────┬───────┘    └────┬─────┘
-            │                 │
-            v                 v
-      ┌─────────────────────────┐
-      │    Frontend Display      │
-      │  - Research Strategy     │
-      │  - Live Agent Status     │
-      │  - Final Results         │
-      │  - Interactive Charts    │
-      │  - Download (PDF/MD/JSON)│
-      └──────────────────────────┘
-
-Total Time: ~105 seconds (1.75 minutes) with parallel execution
-vs. 150 seconds (2.5 minutes) sequential - 30% faster!
+User query + companies
+        |
+        v
+FastAPI (main.py): LangGraph, WebSocket updates, rate limiting
+        |
+        v
+Coordinator
+        |
+        +-------------------+
+        v                   v
+  Web Research        Financial Intel      (parallel stage 1)
+        |                   |
+        +---------+---------+
+                  v
+            Data Analyst
+                  |
+                  v
+            Fact Checker  <---- approval gate (continue or stop)
+                  |
+        +---------+---------+
+        v                   v
+ Content Synthesizer    Data Viz           (parallel stage 2)
+        |                   |
+        +---------+---------+
+                  v
+   Report, charts, PDF / Markdown / JSON export
 ```
+
+I have not timed the stages, so the diagram carries no durations. Run time depends on the model, the depth setting and Groq's rate limits.
+
+### State
+
+All agents share one `MarketResearchState` (a TypedDict). Fields that parallel agents write to (`research_findings`, `current_agent`, `cost_tracking`, `errors`, `fact_check_results`, `visualizations`) are declared `Annotated[List[...], operator.add]`, so LangGraph concatenates what each branch returns instead of letting one overwrite the other. Fields that only one agent writes (`competitor_profiles`, `financial_data`, `final_report`) are plain.
 
 ---
 
-## Quick Start
+## Quick start
 
-### Prerequisites
-- Python 3.11+
-- Node.js 18+
-- Ollama (optional, for local LLM) OR Groq API key
+Prerequisites: Python 3.11+, Node.js 18+, and either a Groq API key or a local Ollama.
 
-### Backend Setup
+### Backend
 
 ```bash
 cd backend
-
-# Create virtual environment
 python -m venv venv
-
-# Activate (Windows)
-.\venv\Scripts\activate
-
-# Activate (Mac/Linux)
-source venv/bin/activate
-
-# Install dependencies
+source venv/bin/activate        # Windows: .\venv\Scripts\activate
 pip install -r requirements.txt
 
-# Configure environment
 cp .env.example .env
-# Edit .env and add:
-# - GROQ_API_KEY (required for production)
-# - TAVILY_API_KEY (optional, improves search quality)
+# Add GROQ_API_KEY. Add TAVILY_API_KEY for better search (DuckDuckGo is the fallback).
 
-# Run server
 python -m app.main
 ```
 
-Server runs at: `http://localhost:8000`
+The server runs at `http://localhost:8000`. In development it uses Ollama if one is running and Groq otherwise. With `ENVIRONMENT=production` it uses Groq only and requires both `GROQ_API_KEY` and `TAVILY_API_KEY`.
 
-### Frontend Setup
+### Frontend
 
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Configure environment
-cp .env.example .env.local
-# For local dev, defaults work
-# For production, set NEXT_PUBLIC_API_URL
-
-# Run dev server
+cp .env.example .env.local      # defaults work for local development
 npm run dev
 ```
 
-Frontend runs at: `http://localhost:3000`
+The frontend runs at `http://localhost:3000`.
 
----
-
-## Features
-
-### Core Capabilities
-
-✅ **Strategic Multi-Agent Orchestration**
-- 7 specialized agents with coordinator-driven execution
-- LangGraph state machines with parallel execution (2 stages)
-- Strategic coordinator generates: objectives, priorities, focus areas, depth settings
-- All agents adapt behavior based on coordinator's guidance
-- Error handling with exponential backoff retries (3 attempts)
-
-✅ **Intelligent Research with Caching**
-- Redis-backed search caching (5-10x speedup, protects Tavily quota)
-- Dual search: Tavily API (premium) + DuckDuckGo (free fallback)
-- Web scraping for comprehensive depth (full page content)
-- RAG integration (queries the Enterprise RAG knowledge base)
-- Depth-based research: light (fast) / standard (balanced) / comprehensive (thorough)
-
-✅ **Comprehensive Analysis**
-- SWOT analysis per company (with financial metrics)
-- Feature comparison matrix (coordinator's comparison angles prioritized)
-- Market positioning insights
-- Pricing comparisons with financial context
-- Fact-checking with confidence scores + Human-in-the-Loop approval gates
-
-✅ **Professional Output**
-- Research strategy (coordinator's plan visible to users)
-- Executive summary (2-3 paragraphs, objectives-focused)
-- Detailed markdown report (structured around research objectives)
-- Interactive Chart.js visualizations (bar, line, pie, doughnut)
-- PDF export with embedded charts
-- Source attribution with URLs
-
-✅ **Real-Time Monitoring & Human Oversight**
-- WebSocket live updates (agent status, progress, messages)
-- Loading skeletons for better UX
-- Human-in-the-Loop approval gates (pause workflow for quality review)
-- Approval modal with context preview
-- Cost tracking with tiktoken (accurate per-call, per-agent breakdown)
-
-✅ **Production Features**
-- Parallel execution (30% faster: 105s vs 150s)
-- Accurate token counting (tiktoken, auto-detects llama3 vs llama-3.3-70b)
-- Per-company and per-call cost tracking
-- Rate limiting (5 req/min, protects quotas)
-- Configuration validation (fail-fast on startup)
-- Redis caching with 1-hour TTL
-- Health check endpoints (service, cache, LLM)
-- Error handling with proper logging
-- Docker deployment
-- Zero deprecation warnings
-
----
-
-## API Endpoints
-
-### REST API
-
-| Method | Endpoint | Description | Rate Limit |
-|--------|----------|-------------|------------|
-| GET | `/health` | Health check | None |
-| GET | `/api/cache/stats` | Cache performance metrics | None |
-| GET | `/api/llm/health` | LLM provider status | None |
-| POST | `/api/research` | Start research workflow | 5/minute |
-| POST | `/api/approval/respond` | Submit HITL approval decision | None |
-| GET | `/api/approval/pending/{session_id}` | Get pending approvals | None |
-| GET | `/docs` | Interactive API documentation (Swagger) | None |
-| GET | `/redoc` | API documentation (ReDoc) | None |
-
-### WebSocket
-
-| Endpoint | Description |
-|----------|-------------|
-| `WS /ws/research/{session_id}` | Real-time agent updates, HITL approvals, workflow status |
-
-### Message Types (WebSocket)
-- `workflow_started` - Research begins
-- `agent_status` - Agent progress updates
-- `approval_request` - Human approval needed
-- `approval_received` - Approval processed
-- `workflow_complete` - Research finished
-- `workflow_failed` - Research error
-
-### Example Request
+### Example request
 
 ```bash
 curl -X POST http://localhost:8000/api/research \
@@ -274,493 +128,129 @@ curl -X POST http://localhost:8000/api/research \
 
 ---
 
+## API
+
+| Method | Endpoint | Description | Rate limit |
+|--------|----------|-------------|------------|
+| GET | `/health` | Health check | None |
+| GET | `/api/cache/stats` | Search cache hits, misses and backend in use | None |
+| GET | `/api/llm/health` | Which LLM provider and model is active | None |
+| POST | `/api/research` | Start a research run | 5 per minute per IP |
+| POST | `/api/approval/respond` | Answer the approval gate | None |
+| GET | `/api/approval/pending/{session_id}` | List pending approvals | None |
+| GET | `/docs`, `/redoc` | Swagger and ReDoc | None |
+
+`WS /ws/research/{session_id}` streams `workflow_started`, `agent_status`, `approval_request`, `approval_received`, `workflow_complete` and `workflow_failed`.
+
+---
+
+## Configuration
+
+Backend `.env`:
+
+```bash
+GROQ_API_KEY=your_groq_key          # required in production
+TAVILY_API_KEY=your_tavily_key      # required in production, optional in development
+REDIS_URL=your_redis_url            # optional, an in-memory cache is used without it
+ENVIRONMENT=development             # or production
+
+# Optional: override the Groq model. Set this when Groq retires one.
+# DEFAULT_LLM_MODEL=openai/gpt-oss-120b
+# Optional: models to move to when the default is rate limited (comma separated).
+# FALLBACK_LLM_MODELS=openai/gpt-oss-20b,qwen/qwen3.8-27b
+```
+
+Other settings (`RAG_API_URL`, `OLLAMA_BASE_URL`, `LOG_LEVEL`, `CACHE_TTL`, `MAX_PARALLEL_AGENTS`, `AGENT_TIMEOUT`) have defaults in `backend/app/core/config.py`.
+
+Frontend `.env.local`:
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_WS_URL=ws://localhost:8000
+```
+
+## Behaviour worth knowing
+
+- **Search cache.** Search results are cached for one hour (`CACHE_TTL`), in Redis when `REDIS_URL` is set and in memory otherwise. The deployed API currently reports `"cache_type": "in-memory"` at `/api/cache/stats`, so the demo is not using Redis right now.
+- **Rate limit.** `/api/research` allows 5 requests per minute per IP, which protects the Tavily and Groq quotas.
+- **Retries.** Each agent makes up to 5 attempts. When the default model is rate limited, the agent moves to the next model in `FALLBACK_LLM_MODELS`. Once that list is used up, or for any other error, it waits before retrying: as long as Groq says when it says (capped at 30 seconds), otherwise 1, 2, 4 and 8 seconds.
+- **Token counting.** tiktoken counts tokens for the cost tracking and for truncating prompts to fit the model's per-minute budget.
+- **RAG.** The web research agent asks the [Enterprise RAG Knowledge Base](https://github.com/Exalt24/enterprise-rag-knowledge-base) for existing knowledge and carries on without it if that service is down or slow.
+- **Fail-fast config.** The backend refuses to start in production without its API keys.
+
+---
+
 ## Deployment
 
-### Deploy Backend to Render
+### Backend on Render
 
-The backend ships as a Docker image (`backend/Dockerfile`), so deploy it as a Docker web service:
+The backend ships as a Docker image, so deploy it as a Docker web service. There is no `render.yaml`.
 
-1. Go to https://dashboard.render.com and create a new **Web Service**
-2. Connect this GitHub repository
-3. Set the runtime to **Docker** and point it at the backend:
-   - **Dockerfile Path:** `./backend/Dockerfile`
-   - **Docker Build Context Directory:** `./backend`
-4. Add environment variables:
-   - `GROQ_API_KEY` (required)
-   - `TAVILY_API_KEY` (required)
-   - `REDIS_URL` (optional, falls back to in-memory cache)
-   - `ENVIRONMENT=production`
-5. Deploy. The container exposes port 8000 and has a `/health` check built in.
+1. Create a new Web Service on https://dashboard.render.com and connect this repository.
+2. Set the runtime to Docker, with Dockerfile path `./backend/Dockerfile` and build context `./backend`.
+3. Add `GROQ_API_KEY` and `TAVILY_API_KEY`, optionally `REDIS_URL`, and set `ENVIRONMENT=production`.
+4. Deploy. The container exposes port 8000 and a `/health` check.
 
-### Deploy Frontend to Vercel
+### Frontend on Vercel
 
-Via Vercel Dashboard or CLI:
 ```bash
 cd frontend
 vercel --prod --yes
 ```
 
-After backend deployment, update Vercel environment variables:
-```bash
-NEXT_PUBLIC_API_URL=https://your-backend.onrender.com
-NEXT_PUBLIC_WS_URL=wss://your-backend.onrender.com
-```
+Set `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` (`wss://`) to the backend URL before building.
 
 ---
 
-## Tech Stack
-
-### Backend
-- **Framework:** FastAPI (async, auto-docs)
-- **Agent Orchestration:** LangGraph (state machines)
-- **LLMs:** Ollama (local dev), Groq (cloud production)
-- **Search:** Tavily API (primary), DuckDuckGo (fallback)
-- **Search Caching:** Redis (cloud-hosted)
-- **Web Scraping:** BeautifulSoup4, requests
-- **RAG Integration:** [Enterprise RAG Knowledge Base](https://github.com/Exalt24/enterprise-rag-knowledge-base) API
-
-### Frontend
-- **Framework:** Next.js 16 (App Router, Turbopack)
-- **Language:** TypeScript
-- **Styling:** Tailwind CSS
-- **Real-Time:** WebSocket client
-- **Deployment:** Vercel
-
-### Free Tier Services
-- **Groq:** 30 requests/min (LLM)
-- **Tavily:** 500/month (search - protected by Redis caching)
-- **Redis Cloud:** Free tier available (search result caching)
-- **Render:** 750 hours/month (backend)
-- **Vercel:** Unlimited (frontend)
-
-**Total Cost:** $0/month
-
----
-
-## Project Structure
+## Project structure
 
 ```
 multi-agent-research/
 ├── backend/
 │   ├── app/
-│   │   ├── agents/                    # Agent implementations
-│   │   │   ├── state.py               # MarketResearchState schema with Literal types
-│   │   │   ├── state_utils.py         # Timestamp & state helper functions
-│   │   │   ├── base.py                # BaseAgent with retry, HITL, cost tracking
-│   │   │   ├── coordinator.py         # Strategic planning with JSON output
-│   │   │   ├── web_research.py        # Web search + scraping + RAG
-│   │   │   ├── financial_intel.py     # Financial data research
-│   │   │   ├── data_analyst.py        # SWOT + comparisons
-│   │   │   ├── fact_checker.py        # Validation + HITL gate
-│   │   │   ├── content_synthesizer.py # Report generation (2 LLM calls)
-│   │   │   ├── data_viz.py            # Chart.js specifications
-│   │   │   ├── graph.py               # LangGraph with parallel execution
-│   │   │   └── tools/                 # Agent tools
-│   │   │       ├── search.py          # Tavily, DuckDuckGo, Redis cache
-│   │   │       └── rag_client.py      # Enterprise RAG integration
-│   │   ├── api/
-│   │   │   ├── schemas.py             # Pydantic models + HITL schemas
-│   │   │   └── websocket.py           # WebSocket manager + HITL messages
-│   │   ├── core/
-│   │   │   ├── config.py              # Settings with validation
-│   │   │   ├── llm.py                 # LLM manager (Ollama/Groq)
-│   │   │   └── tokens.py              # tiktoken utilities
-│   │   ├── services/
-│   │   │   ├── cache.py               # Redis search result caching
-│   │   │   └── hitl_manager.py        # Human-in-the-Loop approval manager
-│   │   └── main.py                    # FastAPI app with rate limiting
-│   ├── test_api.py                    # End-to-end API smoke test
+│   │   ├── agents/          # one file per agent, plus base.py, state.py, graph.py
+│   │   │   └── tools/       # search.py (Tavily, DuckDuckGo, scraper), rag_client.py
+│   │   ├── api/             # schemas.py, websocket.py
+│   │   ├── core/            # config.py, llm.py, tokens.py
+│   │   ├── services/        # cache.py, hitl_manager.py
+│   │   └── main.py          # FastAPI app and rate limiting
+│   ├── test_api.py          # end-to-end smoke test
 │   ├── requirements.txt
-│   ├── Dockerfile
-│   └── .env.example
-│
+│   └── Dockerfile
 ├── frontend/
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── page.tsx               # Home (research form)
-│   │   │   └── research/
-│   │   │       └── [sessionId]/page.tsx  # Live monitoring + results
-│   │   ├── components/
-│   │   │   ├── AgentCard.tsx          # Agent status card
-│   │   │   ├── AgentCardSkeleton.tsx  # Loading skeletons
-│   │   │   ├── ChartRenderer.tsx      # Chart.js renderer
-│   │   │   └── ApprovalModal.tsx      # HITL approval UI
-│   │   ├── hooks/
-│   │   │   └── useWebSocket.ts        # WebSocket client + HITL
-│   │   └── utils/
-│   │       └── pdfExport.ts           # PDF generation with charts
-│   └── package.json
-│
-├── README.md                           # User documentation
-└── SYSTEM-KNOWLEDGE.md                 # Technical deep dive
+│   └── src/
+│       ├── app/             # home form, live research page
+│       ├── components/      # AgentCard, ChartRenderer, ApprovalModal
+│       ├── hooks/           # useWebSocket.ts
+│       └── utils/           # pdfExport.ts (jsPDF, html2canvas)
+├── README.md
+└── SYSTEM-KNOWLEDGE.md      # design notes
 ```
-
----
-
-## How It Works
-
-### Workflow Execution
-
-```
-1. User submits query + companies → Frontend
-2. Frontend POST /api/research → Backend (rate-limited: 5/min)
-3. Backend creates session_id, returns immediately (<100ms)
-4. Frontend connects WebSocket, receives live updates
-5. LangGraph executes agents with parallel optimization:
-
-   Coordinator Agent (10s)
-   ↓ Generates strategic guidance (JSON):
-     - research_objectives (what questions to answer)
-     - search_priorities (keywords per company)
-     - financial_priorities (metrics to collect)
-     - comparison_angles (dimensions to compare)
-     - depth_settings (light/standard/comprehensive per agent)
-
-   ┌─────────────────────┴────────────────────┐
-   │       PARALLEL STAGE 1: Research         │
-   ├─────────────────────┬────────────────────┤
-   Web Research (40s)    Financial Intel (30s)
-   - Uses search_priorities from coordinator
-   - Redis cache check first (5-10x speedup)
-   - Depth-based search volume
-   - Web scraping (comprehensive depth)
-   - RAG integration
-   ↓                     ↓
-   └─────────────────────┬────────────────────┘
-                         │ (Both complete)
-   Data Analyst Agent (20s)
-   ↓ Combines web + financial data
-   ↓ Uses coordinator's comparison_angles
-   ↓ Depth-based sections (light/standard/comprehensive)
-
-   Fact Checker Agent (15s)
-   ↓ Validates claims
-   ↓ HITL Gate: If issues detected →
-     - Pauses workflow
-     - Modal appears with report preview
-     - User decides: Continue or Stop
-     - Workflow resumes or ends based on decision
-
-   ┌─────────────────────┴────────────────────┐
-   │       PARALLEL STAGE 2: Output           │
-   ├─────────────────────┬────────────────────┤
-   Content Synth (20s)   Data Viz (15s)
-   - Uses objectives      - Generates Chart.js
-   - 2 LLM calls          - Bar/Line/Pie/Doughnut
-   ↓                     ↓
-   └─────────────────────┬────────────────────┘
-                         │
-   Final Report Complete (105 seconds total)
-
-6. Backend sends workflow_complete via WebSocket
-7. Frontend displays: strategy, results, charts, downloads
-
-Total Time: 105 seconds (1.75 minutes) - 30% faster than sequential!
-WebSocket: Real-time updates at every step
-```
-
-### State Management
-
-All agents share a single `MarketResearchState` (TypedDict) that accumulates:
-- **Strategic guidance** (coordinator's objectives, priorities, angles, depth settings)
-- Research findings (Web + Financial, uses operator.add for parallel-safe accumulation)
-- Competitor profiles (web research data)
-- Financial data (funding, revenue, growth)
-- Comparative analysis (SWOT, feature matrix, positioning)
-- Fact-check results (with operator.add)
-- Final report + executive summary
-- Visualizations (Chart.js specs, with operator.add)
-- **Active agents** (current_agent: List[str] with operator.add - shows which agents are running, including parallel pairs)
-- **Cost tracking** (cost_tracking: List[Dict] with operator.add - per-agent cost info from all 7 agents)
-- Errors (with operator.add for parallel error collection)
-- HITL state (pending approvals, responses)
-
-**operator.add pattern:** Fields marked with `Annotated[List[T], operator.add]` automatically concatenate when multiple agents write to them in parallel. Critical for parallel execution:
-- `current_agent` accumulates all active agents (shows "2 agents running" during parallel stages)
-- `cost_tracking` preserves costs from all agents including those running in parallel
-- `errors` collects errors from any parallel agent without overwriting
-- `research_findings`, `fact_check_results`, `visualizations` all use this pattern
-
-LangGraph passes state through the workflow, each agent reads coordinator's guidance and updates relevant fields.
-
----
-
-## Example Output
-
-**Input:**
-```
-Query: "Compare Notion vs Coda vs ClickUp for project management"
-Companies: ["Notion", "Coda", "ClickUp"]
-```
-
-**Output (Generated Report):**
-
-### Executive Summary
-Notion, Coda, and ClickUp are leading project management platforms offering collaborative workspaces. Notion leads in customization and knowledge management, Coda excels in document-database hybrid capabilities, and ClickUp provides comprehensive task management features. Pricing varies from free tiers to enterprise plans.
-
-### Comparative Analysis
-[Feature comparison matrix, SWOT for each, market positioning]
-
-### Visualizations
-- Feature comparison radar chart
-- Pricing scatter plot
-- Market positioning matrix
-
-### Sources
-[15+ URLs from Tavily, DuckDuckGo, scraped websites]
-
----
-
-## Development
-
-### Test API
-
-The backend ships an end-to-end smoke test (`backend/test_api.py`) that hits the running server. Start the backend first, then in another terminal:
-
-```bash
-cd backend
-
-# Health check
-curl http://localhost:8000/health
-
-# Full workflow test (health + research endpoint)
-python test_api.py
-```
-
-### WebSocket Testing
-
-```javascript
-const ws = new WebSocket("ws://localhost:8000/ws/research/session-id-here");
-ws.onmessage = (event) => console.log(JSON.parse(event.data));
-```
-
----
-
-## Environment Variables
-
-### Backend (.env)
-
-```bash
-# LLM Configuration
-GROQ_API_KEY=your_groq_key              # Required for production
-OLLAMA_BASE_URL=http://localhost:11434  # For local development
-
-# Search APIs
-TAVILY_API_KEY=your_tavily_key          # Required for quality search
-
-# Redis (Search Result Caching)
-REDIS_URL=your_upstash_redis_url        # Optional, uses in-memory fallback
-
-# RAG Integration (Enterprise RAG)
-RAG_API_URL=https://enterprise-rag-api.onrender.com/api
-
-# Application
-ENVIRONMENT=development  # or 'production'
-LOG_LEVEL=INFO
-MAX_PARALLEL_AGENTS=2   # Used for parallel execution stages
-AGENT_TIMEOUT=120       # Timeout per agent in seconds
-CACHE_TTL=3600          # Search cache TTL (1 hour)
-```
-
-### Frontend (.env.local)
-
-```bash
-NEXT_PUBLIC_API_URL=http://localhost:8000           # Dev
-# NEXT_PUBLIC_API_URL=https://your-backend.onrender.com  # Production
-
-NEXT_PUBLIC_WS_URL=ws://localhost:8000              # Dev
-# NEXT_PUBLIC_WS_URL=wss://your-backend.onrender.com     # Production
-```
-
----
-
-## Cost Analysis
-
-| Service | Free Tier | Usage | Cost |
-|---------|-----------|-------|------|
-| **Groq API** | 30 req/min | LLM inference | $0 |
-| **Tavily** | 500/month | Web search (with Redis caching to save quota) | $0 |
-| **Redis Cloud** | Free tier (varies by provider) | Search result caching (1-hour TTL) | $0 |
-| **Render** | 750 hrs/month | Backend hosting | $0 |
-| **Vercel** | Unlimited | Frontend hosting | $0 |
-| **Ollama** | Unlimited | Local dev LLM | $0 |
-| **Total** | | | **$0/month** |
-
-**Quota Protection:**
-- Rate limiting: 5 research requests/minute (prevents quota exhaustion)
-- Redis caching: 5-10x speedup on repeated queries, saves Tavily searches
-- Coordinator depth settings: Light queries use fewer API calls
-
----
-
-## Features Roadmap
-
-### ✅ Completed (Production-Ready)
-- [x] 7 specialized agents with distinct roles
-- [x] LangGraph orchestration with parallel execution (2 stages, 30% speedup)
-- [x] Strategic coordinator with JSON-structured guidance
-- [x] Coordinator-driven agent behavior (priorities, objectives, angles, depth)
-- [x] FastAPI backend with rate limiting (5 req/min)
-- [x] WebSocket real-time monitoring
-- [x] Next.js 16 frontend (App Router, Turbopack)
-- [x] Redis search result caching (5-10x speedup)
-- [x] Accurate token counting (tiktoken with model auto-detection)
-- [x] Per-company and per-call cost tracking
-- [x] RAG integration (Enterprise RAG Knowledge Base)
-- [x] Human-in-the-Loop (HITL) approval gates with quality detection
-- [x] Chart rendering (Chart.js: bar, line, pie, doughnut)
-- [x] PDF export with embedded charts (jsPDF + html2canvas)
-- [x] Loading skeletons for better UX
-- [x] Configuration validation (fail-fast on startup)
-- [x] Depth-based research (light/standard/comprehensive)
-- [x] Web scraping for comprehensive depth
-- [x] Docker deployment
-- [x] Vercel deployment
-- [x] Zero deprecation warnings
-- [x] Zero bare except blocks
-- [x] Zero dead code
-
-### 🔄 Future Enhancements
-- [ ] Qdrant vector storage for historical research (semantic search of past research)
-- [ ] Agent performance A/B testing (compare LLM models, prompt variations)
-- [ ] Workflow templates (pre-configured for specific industries)
-- [ ] Multi-language support (research in non-English markets)
-- [ ] Email report delivery (schedule research, receive via email)
-- [ ] API authentication (user accounts, usage tracking)
-
----
-
-## Deployment Instructions
-
-### Backend (Render)
-
-Deploy the backend as a Docker web service (there is no `render.yaml`, so configure it manually):
-
-1. New Web Service on Render
-2. Connect this GitHub repo
-3. Settings:
-   - **Runtime:** Docker
-   - **Dockerfile Path:** ./backend/Dockerfile
-   - **Docker Build Context Directory:** ./backend
-4. Add environment variables (see below)
-5. Deploy
-
-**Environment variables to add:**
-- `GROQ_API_KEY` (required)
-- `TAVILY_API_KEY` (required)
-- `REDIS_URL` (optional, your Redis connection URL)
-- `ENVIRONMENT=production`
-
-### Frontend (Vercel)
-
-Already deployed! Update after backend deployment:
-
-```bash
-# In Vercel dashboard, add these environment variables:
-NEXT_PUBLIC_API_URL=https://your-backend.onrender.com
-NEXT_PUBLIC_WS_URL=wss://your-backend.onrender.com
-
-# Then redeploy:
-cd frontend
-vercel --prod --yes
-```
-
----
-
----
-
-## Performance & Optimization
-
-### Speed Optimizations (30% Faster Than Sequential)
-- **Parallel execution:** 2 stages run concurrently (Research + Output phases)
-  - Stage 1: Web Research + Financial Intel (saves 30s)
-  - Stage 2: Content Synthesizer + Data Viz (saves 15s)
-  - Total: 105s vs 150s = 30% faster
-- **Redis caching:** 5-10x speedup on repeated queries, 1-hour TTL
-- **Depth-based execution:** Light queries skip unnecessary work
-- **LLM fallback:** Ollama (dev) → Groq (prod) seamless switching
-- **Web scraping:** Only for comprehensive depth (smart resource usage)
-
-### Memory Optimization (512MB Render Free Tier)
-- Lazy agent loading (agents created only when needed)
-- Token-aware truncation (tiktoken prevents context overflow)
-- Connection pooling (Redis, httpx)
-- Parallel execution designed for memory safety (different state fields)
-- Smart caching reduces redundant API calls
-
-### Accuracy Optimizations
-- **tiktoken integration:** 0% error vs 22.9% error with len//4 estimation
-- **Model auto-detection:** Uses correct tokenizer (llama3 or llama-3.3-70b)
-- **Per-company cost tracking:** Aggregates actual LLM calls (not approximations)
-- **Per-call cost tracking:** Content Synthesizer tracks summary + report separately
 
 ---
 
 ## Testing
 
-With the backend running locally, run the end-to-end smoke test against it:
+The only test is a smoke test, `backend/test_api.py`. With the backend running, it posts a research request to `http://localhost:8000` and prints the result. There are no unit tests.
 
 ```bash
 cd backend
-
-# Runs the health check + a full research workflow against http://localhost:8000
 python test_api.py
 ```
 
----
-
 ## Troubleshooting
 
-### Backend won't start
-- Check Ollama is running: `curl http://localhost:11434/api/tags`
-- Or add GROQ_API_KEY to .env
-- Check Python version: `python --version` (need 3.11+)
+- **Backend will not start:** check that Ollama is running (`curl http://localhost:11434/api/tags`) or put a `GROQ_API_KEY` in `.env`. Python 3.11 or newer is required.
+- **A run fails with a model error:** the configured Groq model may have been retired. Set `DEFAULT_LLM_MODEL` to one Groq currently serves.
+- **Frontend cannot connect:** check `NEXT_PUBLIC_API_URL` and the CORS origins in `backend/app/core/config.py`.
+- **WebSocket will not connect:** use `ws://` against http and `wss://` against https, and check the session id.
 
-### Frontend won't connect
-- Check API URL in .env.local
-- Verify backend is running on correct port
-- Check CORS settings in backend/app/main.py
+## Not done
 
-### WebSocket not connecting
-- Verify WebSocket URL (ws:// for http, wss:// for https)
-- Check session_id is valid
-- Look for errors in browser console
-
----
-
-## Tech Highlights for Portfolio
-
-**What Makes This Unique:**
-- **7 specialized agents** with strategic coordinator that actually controls execution (not just documentation)
-- **Parallel execution** at 2 stages using LangGraph (30% speedup, production-grade concurrency)
-- **Strategic coordination pattern:** Coordinator generates JSON guidance (objectives, priorities, angles) that all downstream agents use
-- **Human-in-the-Loop gates:** Quality-based workflow pausing with approval UI
-- **Redis caching** for search results (5-10x speedup, quota protection)
-- **Accurate token counting** with tiktoken and model auto-detection
-- **Real-time WebSocket** with 6 message types (status, approval, completion, etc.)
-- **Microservices integration** (calls the Enterprise RAG Knowledge Base API as a separate service)
-- **Complete feature set:** Charts, PDF export, HITL, caching, rate limiting, validation
-- **100% free tier** ($0/month production cost)
-- **Zero technical debt:** No deprecations, no dead code, no bare excepts
-
-**Interview Talking Points:**
-- **Strategic multi-agent orchestration:** How coordinator guides 7 agents with structured parameters
-- **Parallel execution in LangGraph:** Fan-out/fan-in patterns, operator.add for state merging
-- **State management:** TypedDict with operator.add for parallel-safe accumulation
-- **Cost optimization:** Free tier architecture with Redis caching, rate limiting, depth-based execution
-- **Real-time communication:** WebSocket pub/sub, HITL approval flow, concurrent connection handling
-- **Production patterns:** Retry logic, exponential backoff, timeout protection, graceful degradation
-- **Microservice integration:** Async HTTP with httpx, error resilience, health checks
-- **Token accuracy:** tiktoken integration, model auto-detection (llama3 vs llama-3.3-70b)
-- **Quality gates:** HITL with keyword detection, approval timeout handling, workflow control
-- **End-to-end system:** Backend (FastAPI/LangGraph) + Frontend (Next.js/Chart.js) + Caching (Redis) + RAG (Enterprise RAG Knowledge Base)
-
----
+- No unit or integration tests beyond the smoke test.
+- No authentication or per-user accounts.
+- Search results are cached, but past research is not stored or searchable.
 
 ## License
 
-MIT License - see LICENSE file for details
-
-## Contributing
-
-Contributions welcome! Please open an issue or submit a pull request.
+MIT, see [LICENSE](LICENSE).
