@@ -2,10 +2,7 @@
 
 Seven LangGraph agents that research a set of companies, fact-check the findings, and write a comparison report with charts.
 
-**Live demo:** https://multi-agent-research-frontend.vercel.app
-**API:** https://multi-agent-research-api.onrender.com (interactive docs at `/docs`)
-
-A full run takes a few minutes, and the demo runs on free tiers (Groq, Tavily, Render), so a run can hit Groq's free-tier limits and slow down or fail. The backend sleeps when idle, so the first request after a quiet spell is slow.
+**Demo:** The hosted copy is offline: the free-tier host suspended its services in October 2026, so the links that used to be here led to empty pages and were removed. Everything runs locally from the steps below. A full run takes a few minutes, and it was built for free tiers (Groq, Tavily), so a run can hit Groq's free-tier limits and slow down or fail.
 
 ---
 
