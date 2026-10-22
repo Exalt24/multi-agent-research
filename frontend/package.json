@@ -14,7 +14,7 @@
     "chart.js": "^4.5.1",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
-    "jspdf-autotable": "^5.0.8",
+    "jspdf-autotable": "^5.0.9",
     "next": "^16.2.6",
     "react": "19.3.1",
     "react-chartjs-2": "^5.3.1",
@@ -30,7 +30,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^10",
-    "eslint-config-next": "16.4.1",
+    "eslint-config-next": "16.4.2",
     "tailwindcss": "^4",
     "typescript": "~6.0.3"
   },
