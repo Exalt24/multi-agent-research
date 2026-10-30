@@ -1,6 +1,6 @@
 # Multi-Agent Market Research Platform
 
-[![CI](https://github.com/Exalt24/multi-agent-research/actions/workflows/ci.yml/badge.svg)](https://github.com/Exalt24/multi-agent-research/actions/workflows/ci.yml) (CI installs the backend and runs one offline check; a second workflow lints and builds the frontend)
+[![CI](https://github.com/Exalt24/multi-agent-research/actions/workflows/ci.yml/badge.svg)](https://github.com/Exalt24/multi-agent-research/actions/workflows/ci.yml) (CI installs the backend and runs one self-contained check; a second workflow lints and builds the frontend)
 
 ![A research run: seven agents work through their stages, the fact checker pauses for a human decision, and the report with charts appears](docs/demo.gif)
 
@@ -8,7 +8,7 @@
 
 Seven LangGraph agents that research companies, fact-check the findings and write a comparison report with charts.
 
-**Demo:** The hosted copy is offline: the free-tier host suspended its services in October 2026, so the links that used to be here led to empty pages and were removed. Everything runs locally from the steps below. A full run takes a few minutes, and it was built for free tiers (Groq, Tavily), so a run can hit Groq's free-tier limits and slow down or fail.
+**Demo:** Everything runs locally from the steps below. The free-tier host that served the hosted copy stopped running its services in October 2026, so the links to it were removed. A full run takes a few minutes, and it was built for free tiers (Groq, Tavily), so a run can hit Groq's free-tier limits and slow down or fail.
 
 ---
 
@@ -178,7 +178,7 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8000
 - **Rate limit.** `/api/research` allows 5 requests per minute per IP, which protects the Tavily and Groq quotas.
 - **Retries.** Each agent makes up to 5 attempts. When the default model is rate limited, the agent moves to the next model in `FALLBACK_LLM_MODELS`. Once that list is used up, or for any other error, it waits before retrying: as long as Groq says when it says (capped at 30 seconds), otherwise 1, 2, 4 and 8 seconds.
 - **Token counting.** tiktoken counts tokens for the cost tracking and for truncating prompts to fit the model's per-minute budget.
-- **RAG.** The web research agent asks the [Enterprise RAG Knowledge Base](https://github.com/Exalt24/enterprise-rag-knowledge-base) for existing knowledge and carries on without it if that service is down or slow.
+- **RAG.** The web research agent asks the [Enterprise RAG Knowledge Base](https://github.com/Exalt24/enterprise-rag-knowledge-base) for existing knowledge and carries on without it when that service is unavailable or slow.
 - **Fail-fast config.** The backend refuses to start in production without its API keys.
 
 ---
