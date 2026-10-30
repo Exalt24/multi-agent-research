@@ -249,11 +249,11 @@ python test_api.py
 - **Frontend cannot connect:** check `NEXT_PUBLIC_API_URL` and the CORS origins in `backend/app/core/config.py`.
 - **WebSocket will not connect:** use `ws://` against http and `wss://` against https, and check the session id.
 
-## Not done
+## Next steps
 
-- No unit or integration tests for the agents beyond the smoke test and the 3 output limit asserts.
-- No authentication or per-user accounts.
-- Search results are cached, but past research is not stored or searchable.
+- Unit and integration tests for the agents, beyond the smoke test and the 3 output limit asserts.
+- Authentication and per-user accounts.
+- Storing past research and making it searchable (search results are cached today).
 
 ## License
 
