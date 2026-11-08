@@ -4,17 +4,17 @@
 
 ![A research run: seven agents work through their stages, the fact checker pauses for a human decision, and the report with charts appears](docs/demo.gif)
 
-*A full run in the app: agents work in stages, the fact checker pauses for a human decision, then the report and charts appear (recorded locally with a stand-in model and canned search results, so the chart values are illustrative).*
+*A full run in the app. Agents work in stages, the fact checker pauses for a human decision, then the report and charts appear. It was recorded locally with a stand-in model and canned search results, so the chart values are illustrative.*
 
 Seven LangGraph agents that research companies, fact-check the findings and write a comparison report with charts.
 
-**Demo:** Everything runs locally from the steps below. The free-tier host that served the hosted copy stopped running its services in October 2026, so the links to it were removed. A full run takes a few minutes, and it was built for free tiers (Groq, Tavily), so a run can hit Groq's free-tier limits and slow down or fail.
+**Demo:** Everything runs locally from the steps below. The free-tier host that served the hosted copy stopped running its services in October 2026, so the links to it were removed. A full run takes a few minutes. It was built for free tiers (Groq, Tavily), so a run can hit Groq's free-tier limits and slow down or fail.
 
 ---
 
 ## What it does
 
-You give it a query and a list of companies. A coordinator agent plans the research, two agents gather web and financial data in parallel, an analyst builds SWOT and feature comparisons, a fact checker reviews the claims, and two more agents write the report and generate chart specs in parallel. Progress streams to the browser over a WebSocket while it runs. The result can be downloaded as PDF, Markdown or JSON.
+You give it a query and a list of companies. A coordinator agent plans the research. Two agents gather web and financial data in parallel. An analyst builds SWOT and feature comparisons. A fact checker reviews the claims. Two more agents write the report and generate chart specs in parallel. Progress streams to the browser over a WebSocket while it runs. The result can be downloaded as PDF, Markdown or JSON.
 
 - **Agents:** 7, with two parallel stages (research, then output)
 - **Human in the loop:** one gate, in the fact checker (see below)
@@ -23,9 +23,9 @@ You give it a query and a list of companies. A coordinator agent plans the resea
 
 ## What broke
 
-In early September 2026 Groq retired the `llama-3.3-70b-versatile` model name, and this demo and the Enterprise RAG service it calls both started failing within a day of each other. Every agent I watched died on a raw `model_not_found` error. The fix was to make the model a setting (`DEFAULT_LLM_MODEL`, default `openai/gpt-oss-120b`) so the next retirement is an environment variable change instead of a code change.
+In early September 2026 Groq retired the `llama-3.3-70b-versatile` model name. This demo and the Enterprise RAG service it calls both started failing within a day of each other. Every agent I watched died on a raw `model_not_found` error. The fix was to make the model a setting (`DEFAULT_LLM_MODEL`, default `openai/gpt-oss-120b`). The next retirement is now an environment variable change instead of a code change.
 
-That same week I found the content synthesizer could never succeed on the free tier: its two calls asked for roughly eleven thousand tokens against a per-minute ceiling of eight thousand. The token budgets are now named constants in `content_synthesizer.py`, and a rate-limited agent now moves to the next model in `FALLBACK_LLM_MODELS`, because Groq's quotas are per model, and once that list is used up it waits as long as Groq asks.
+That same week I found the content synthesizer could never succeed on the free tier. Its two calls asked for roughly eleven thousand tokens against a per-minute ceiling of eight thousand. The token budgets are now named constants in `content_synthesizer.py`. A rate-limited agent now moves to the next model in `FALLBACK_LLM_MODELS`, because Groq's quotas are per model. Once that list is used up, it waits as long as Groq asks.
 
 ---
 
@@ -41,11 +41,11 @@ That same week I found the content synthesizer could never succeed on the free t
 | **Content Synthesizer** | Writes the summary and the full report around the coordinator's objectives | LLM, two calls | Parallel with Data Viz |
 | **Data Visualization** | Produces Chart.js specs (bar, line, pie, doughnut) for the frontend | LLM | Parallel with Synthesizer |
 
-The coordinator's output is used, not decorative: its priorities become the search queries, its comparison angles go into the analyst's prompt, and its objectives frame the report. Its depth settings (light, standard, comprehensive) change how many queries, results, RAG chunks and scraped pages each agent uses.
+The coordinator's output is used, not decorative. Its priorities become the search queries. Its comparison angles go into the analyst's prompt. Its objectives frame the report. Its depth settings (light, standard, comprehensive) change how many queries, results, RAG chunks and scraped pages each agent uses.
 
 ## The human-in-the-loop gate
 
-There is exactly one. After the fact checker writes its report, the backend looks for the words "unverified", "could not verify", "insufficient evidence" or "contradictory". If any appear, the run pauses and the browser shows an approval modal with a preview of the report and two choices, continue or stop. If nobody answers within 300 seconds, the run continues. If the approval mechanism itself errors, the run also continues.
+There is exactly one. After the fact checker writes its report, the backend looks for the words "unverified", "could not verify", "insufficient evidence" or "contradictory". If any appear, the run pauses. The browser shows an approval modal with a preview of the report and two choices, continue or stop. If nobody answers within 300 seconds, the run continues. If the approval mechanism itself errors, the run also continues.
 
 ## Architecture
 
@@ -82,7 +82,7 @@ I have not timed the stages, so the diagram carries no durations. Run time depen
 
 ### State
 
-All agents share one `MarketResearchState` (a TypedDict). Fields that parallel agents write to (`research_findings`, `current_agent`, `cost_tracking`, `errors`, `fact_check_results`, `visualizations`) are declared `Annotated[List[...], operator.add]`, so LangGraph concatenates what each branch returns instead of letting one overwrite the other. Fields that only one agent writes (`competitor_profiles`, `financial_data`, `final_report`) are plain.
+All agents share one `MarketResearchState` (a TypedDict). Fields that parallel agents write to (`research_findings`, `current_agent`, `cost_tracking`, `errors`, `fact_check_results`, `visualizations`) are declared `Annotated[List[...], operator.add]`. LangGraph then concatenates what each branch returns instead of letting one overwrite the other. Fields that only one agent writes (`competitor_profiles`, `financial_data`, `final_report`) are plain.
 
 ---
 
@@ -104,7 +104,7 @@ cp .env.example .env
 python -m app.main
 ```
 
-The server runs at `http://localhost:8000`. In development it uses Ollama, so start Ollama; the Groq fallback does not run if Ollama is down. With `ENVIRONMENT=production` it uses Groq only and requires both `GROQ_API_KEY` and `TAVILY_API_KEY`.
+The server runs at `http://localhost:8000`. In development it uses Ollama, so start Ollama. The Groq fallback does not run if Ollama is down. With `ENVIRONMENT=production` it uses Groq only. It requires both `GROQ_API_KEY` and `TAVILY_API_KEY`.
 
 ### Frontend
 
@@ -176,7 +176,7 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8000
 
 - **Search cache.** Search results are cached for one hour (`CACHE_TTL`), in Redis when `REDIS_URL` is set and in memory otherwise.
 - **Rate limit.** `/api/research` allows 5 requests per minute per IP, which protects the Tavily and Groq quotas.
-- **Retries.** Each agent makes up to 5 attempts. When the default model is rate limited, the agent moves to the next model in `FALLBACK_LLM_MODELS`. Once that list is used up, or for any other error, it waits before retrying: as long as Groq says when it says (capped at 30 seconds), otherwise 1, 2, 4 and 8 seconds.
+- **Retries.** Each agent makes up to 5 attempts. When the default model is rate limited, the agent moves to the next model in `FALLBACK_LLM_MODELS`. Once that list is used up, or for any other error, it waits before retrying. The wait is as long as Groq says when it says (capped at 30 seconds). Otherwise it is 1, 2, 4 and 8 seconds.
 - **Token counting.** tiktoken counts tokens for the cost tracking and for truncating prompts to fit the model's per-minute budget.
 - **RAG.** The web research agent asks the [Enterprise RAG Knowledge Base](https://github.com/Exalt24/enterprise-rag-knowledge-base) for existing knowledge and carries on without it when that service is unavailable or slow.
 - **Fail-fast config.** The backend refuses to start in production without its API keys.
@@ -235,7 +235,7 @@ multi-agent-research/
 
 ## Testing
 
-Two scripts. `backend/test_output_limit.py` is 3 offline asserts and the only thing CI runs. `backend/test_api.py` is a smoke test: with the backend running, it posts a research request to `http://localhost:8000` and prints the session id and status; it does not open the WebSocket, so it does not wait for or print the report. There are no unit tests for the agents.
+Two scripts. `backend/test_output_limit.py` is 3 offline asserts and the only thing CI runs. `backend/test_api.py` is a smoke test. With the backend running, it posts a research request to `http://localhost:8000` and prints the session id and status. It does not open the WebSocket, so it does not wait for or print the report. There are no unit tests for the agents.
 
 ```bash
 cd backend
