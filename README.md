@@ -8,7 +8,7 @@
 
 Seven LangGraph agents that research companies, fact-check the findings and write a comparison report with charts.
 
-**Demo:** Everything runs locally from the steps below. The free-tier host that served the hosted copy stopped running its services in October 2026, so the links to it were removed. A full run takes a few minutes. It was built for free tiers (Groq, Tavily), so a run can hit Groq's free-tier limits and slow down or fail.
+**Demo:** Everything runs locally from the steps below. A full run takes a few minutes. It was built for free tiers (Groq, Tavily), so a run can hit Groq's free-tier limits and slow down or fail.
 
 ---
 
