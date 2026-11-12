@@ -54,7 +54,7 @@ numpy==2.5.4
 ollama==0.6.3
 orjson==3.13.0
 ormsgpack==1.13.0
-packaging==25.0
+packaging==26.3
 pluggy==1.7.0
 portalocker==4.4.2
 primp==2.0.1
