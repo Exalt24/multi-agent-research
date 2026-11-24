@@ -6,6 +6,10 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    ignore:
+      # dataclasses-json 0.6.7 (via langchain-community) requires marshmallow<4, so the 4.x major cannot resolve
+      - dependency-name: "marshmallow"
+        update-types: ["version-update:semver-major"]
     groups:
       minor-and-patch:
         update-types: [minor, patch]
